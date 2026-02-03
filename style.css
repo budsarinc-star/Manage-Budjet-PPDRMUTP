@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600;700&display=swap');
+
+* { font-family: 'Anuphan', sans-serif; transition: all 0.2s ease; }
+
+body { background-color: #ede9fe; }
+
+.login-gradient-wrapper { background: linear-gradient(135deg, #a78bfa 0%, #3b82f6 33%, #2dd4bf 66%, #f472b6 100%); }
+
+.card-main { background: #ffffff; border-radius: 2rem; box-shadow: 0 15px 35px rgba(0,0,0,0.08); border: 1px solid #ffffff; }
+
+.rainbow-line { height: 4px; background: linear-gradient(90deg, #ff4d4d, #ffa64d, #ffff4d, #4dff4d, #4dffff, #4d4dff, #a64dff); border-radius: 10px 10px 0 0; }
+
+.menu-active { background: #7c3aed !important; color: white !important; box-shadow: 0 10px 25px rgba(124, 58, 237, 0.4); }
+
+.input-flat { background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 0.75rem 1rem; border-radius: 0.85rem; font-size: 0.875rem; outline: none; }
+.input-flat:focus { border-color: #7c3aed; background: #ffffff; box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.05); }
+
+.table-header { background: #f1f5f9; color: #64748b; font-weight: bold; text-transform: uppercase; font-size: 0.7rem; }
+
+@media print {
+    .no-print { display: none !important; }
+    main { margin: 0; padding: 0; background: white; }
+    .card-main { border-radius: 0; border: none; box-shadow: none; }
+}
