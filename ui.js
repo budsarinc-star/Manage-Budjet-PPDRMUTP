@@ -923,32 +923,41 @@ const UI = {
                     </div>
 
                     <div class="flex flex-col gap-2 border-l-2 border-purple-100 pl-4">
-                        <label class="text-[11px] font-bold text-gray-500">ความสอดคล้องกับประเด็นยุทธศาสตร์</label>
+                        <label class="text-[11px] font-bold text-gray-500">โปรดเลือก "แผนพัฒนามหาวิทยาลัยฉบับที่"</label>
                         <div class="flex gap-2 items-center">
                             <select id="strat-parent-10" class="input-flat w-56 text-sm bg-gray-50/50 font-bold"></select>
-                            <input id="strat-lvl-10" placeholder="เลือกฉบับที่ > ระบุยุทธศาสตร์ที่ ...." class="input-flat flex-1 text-sm bg-gray-50/50">
+                            <input id="strat-lvl-10" placeholder="เลือกฉบับที่ > ระบุประเด็นยุทธศาสตร์..." class="input-flat flex-1 text-sm bg-gray-50/50">
                             <button onclick="App.saveStratNew(10)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="link" size="18"></i></button>
                         </div>
                     </div>
 
                     <div class="flex flex-col gap-2 border-l-2 border-purple-100 pl-4">
-                        <label class="text-[11px] font-bold text-gray-500">ความสอดคล้องกับมิติ Balanced Scorecard</label>
+                        <label class="text-[11px] font-bold text-gray-500">โปรดเลือก "ความสอดคล้องกับประเด็นยุทธศาสตร์"</label>
                         <div class="flex gap-2 items-center">
                             <select id="strat-parent-11" class="input-flat w-56 text-sm bg-gray-50/50 font-bold"></select>
-                            <input id="strat-lvl-11" placeholder="เลือกฉบับที่ > ยุทธศาสตร์ที่> ระบุมิติที่ ...." class="input-flat flex-1 text-sm bg-gray-50/50">
+                            <input id="strat-lvl-11" placeholder="เลือกฉบับที่ > ประเด็นยุทธศาสตร์ > ระบุกลยุทธ์..." class="input-flat flex-1 text-sm bg-gray-50/50">
                             <button onclick="App.saveStratNew(11)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="link" size="18"></i></button>
                         </div>
                     </div>
 
                     <div class="flex flex-col gap-2 border-l-2 border-purple-100 pl-4">
-                        <label class="text-[11px] font-bold text-gray-500">สอดคล้องกับตัวชี้วัดความสำเร็จตามแผนพัฒนามหาวิทยาลัยเทคโนโลยี</label>
+                        <label class="text-[11px] font-bold text-gray-500">โปรดเลือก "ความสอดคล้องกับกลยุทธ์"</label>
                         <div class="flex gap-2 items-center">
                             <select id="strat-parent-12" class="input-flat w-56 text-sm bg-gray-50/50 font-bold"></select>
-                            <input id="strat-lvl-12" placeholder="เลือกฉบับที่ >ยุทธศาสตร์ที่ > มิติที่ > ระบุตัวชี้วัดที่ ...." class="input-flat flex-1 text-sm bg-gray-50/50">
+                            <input id="strat-lvl-12" placeholder="เลือกฉบับที่ > ประเด็นยุทธศาสตร์ > กลยุทธ์ > ระบุมิติ..." class="input-flat flex-1 text-sm bg-gray-50/50">
                             <button onclick="App.saveStratNew(12)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="link" size="18"></i></button>
                         </div>
                     </div>
-                </div>
+
+                    <div class="flex flex-col gap-2 border-l-2 border-purple-100 pl-4">
+                        <label class="text-[11px] font-bold text-gray-500">โปรดเลือก "ความสอดคล้องกับมิติ"</label>
+                        <div class="flex gap-2 items-center">
+                            <select id="strat-parent-13" class="input-flat w-56 text-sm bg-gray-50/50 font-bold"></select>
+                            <input id="strat-lvl-13" placeholder="เลือกฉบับแผน > ประเด็นยุทธศาสตร์ > กลยุทธ์ > มิติ > ระบุตัวชี้วัด..." class="input-flat flex-1 text-sm bg-gray-50/50">
+                            <button onclick="App.saveStratNew(13)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="link" size="18"></i></button>
+                        </div>
+                    </div>
+                </div></div>
             </div>
             </div>
 
@@ -971,15 +980,16 @@ const UI = {
         </div>
     </div>
     <div class="space-y-8">
-    ${this.adminTableBlock('ประเภทเงินงบประมาณ', 'budget_types', ['ลำดับ','ชื่อประเภทเงินงบประมาณ','วันที่บันทึก'])}
+        <!-- แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง (ตารางรวม) -->
+    ${this.adminTableBlock('แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง', 'strat_links', ['ลำดับ','ฉบับแผน','ประเด็นยุทธศาสตร์','กลยุทธ์','มิติ','ตัวชี้วัด','วันที่บันทึก'])}
+
+${this.adminTableBlock('ประเภทเงินงบประมาณ', 'budget_types', ['ลำดับ','ชื่อประเภทเงินงบประมาณ','วันที่บันทึก'])}
     ${this.adminTableBlock('ปีงบประมาณ', 'years', ['ลำดับ','ปี พ.ศ.','สถานะปีงบประมาณ','หมายเหตุ','วันที่บันทึก'])}
     ${this.adminTableBlock('รายการ', 'items', ['ลำดับ','ชื่อรายการ','วันที่บันทึก'])}
     ${this.adminTableBlock('ประเภทครุภัณฑ์', 'categories', ['ลำดับ','ชื่อประเภท','วันที่บันทึก'])}
     ${this.adminTableBlock('หน่วยงาน', 'depts', ['ลำดับ','ชื่อหน่วยงาน','วันที่บันทึก'])}
     ${this.adminTableBlock('สาขา / งาน', 'branches', ['ลำดับ','หน่วยงาน','สาขา/งาน','วันที่บันทึก'])}
 
-    <!-- แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง (ตารางรวม) -->
-    ${this.adminTableBlock('แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง', 'strat_links', ['ลำดับ','ฉบับแผน','ประเด็นยุทธศาสตร์','มิติ','ตัวชี้วัด','วันที่บันทึก'])}
     </div>
 </div>
 <!-- Admin Edit Modal Root (เฉพาะหน้า ตั้งต้นข้อมูล) -->
