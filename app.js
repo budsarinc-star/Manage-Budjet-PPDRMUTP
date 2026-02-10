@@ -1,8 +1,9 @@
 // --- ตัวแปรหลัก ---
-var currentUser = { name: "แอดมิน สูงสุด", role: "admin", dept: "กองนโยบายและแผน" };
+var currentUser = null; // ใช้ผู้ใช้จริงจาก Firestore
 var appId = "budget-manage-v001";
 var tableState = { page: 1, limit: 10, currentType: 'budget_types', fullData: [], searchQuery: '' };
 var analysisState = { page: 1, limit: 10, fullData: [], searchQuery: '' };
+var adminTableState = {}; // state ต่อ 1 ตารางในหน้า ผู้ดูแลระบบ > ตั้งต้นข้อมูล
 
 document.addEventListener('DOMContentLoaded', async () => {
     // แก้ไขระบบลูกตารหัสผ่าน
@@ -26,13 +27,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     lucide.createIcons();
 });
 
-function handleLogin() {
-    document.getElementById('login-container').classList.add('hidden');
-    document.getElementById('main-app').classList.remove('hidden');
-    document.getElementById('u-name-display').innerText = currentUser.name;
-    document.getElementById('u-dept-display').innerText = currentUser.dept;
-    App.navigate('dashboard');
+async function handleLogin() {
+    const uEl = document.getElementById('login-username');
+    const pEl = document.getElementById('login-password');
+    const username = (uEl?.value || '').trim();
+    const password = (pEl?.value || '').trim();
+
+    if (!username || !password) return alert('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
+
+    // กันกดรัว
+    const submitBtn = document.querySelector('#login-form button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        // อ่านผู้ใช้จริงจาก Firestore (ไม่ใช้ Mockup)
+        const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users');
+        const snap = await col.where('username', '==', username).where('password', '==', password).limit(1).get();
+
+        if (snap.empty) {
+            alert('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+            return;
+        }
+
+        const doc = snap.docs[0];
+        const data = doc.data() || {};
+
+        currentUser = {
+            id: doc.id,
+            username,
+            name: data.fullname || data.name || username,
+            role: data.role || 'staff_dept',
+            dept: data.dept || data.org || ''
+        };
+
+        document.getElementById('login-container').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        document.getElementById('u-name-display').innerText = currentUser.name;
+        document.getElementById('u-dept-display').innerText = currentUser.dept;
+        App.navigate('dashboard');
+    } catch (err) {
+        console.error(err);
+        alert('เข้าสู่ระบบไม่สำเร็จ: กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล');
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
 }
+
 
 const App = {
     navigate(pageId) {
@@ -41,8 +81,8 @@ const App = {
         UI.renderSidebar(pageId, currentUser.role);
         switch(pageId) {
             case 'dashboard': title.innerText = "1. Dashboard"; view.innerHTML = UI.dashboardPage(); break;
-            case 'manage': title.innerText = "2. จัดการข้อมูลครุภัณฑ์"; view.innerHTML = UI.managePage(); this.initForm4(); break;
-            case 'admin': title.innerText = "3. ผู้ดูแลระบบ"; view.innerHTML = UI.adminPage(); this.loadMasterTable(); this.fillUserDeptSelect(); this.initAdminSetup(); break;
+            case 'manage': title.innerText = "2. จัดการข้อมูลครุภัณฑ์"; view.innerHTML = UI.managePage(); break;
+            case 'admin': title.innerText = "3. ผู้ดูแลระบบ"; view.innerHTML = UI.adminPage(); this.loadAdminAllTables(); this.fillUserDeptSelect(); this.initAdminSetup(); break;
         }
         lucide.createIcons();
     },
@@ -51,11 +91,10 @@ const App = {
         const view = document.getElementById('content-view');
         if (page === 'admin') {
             view.innerHTML = UI.adminPage(subId);
-            if (subId === 'tab1') { this.loadMasterTable(); this.initAdminSetup(); }
+            if (subId === 'tab1') { this.loadAdminAllTables(); this.initAdminSetup(); }
             if (subId === 'tab2') { this.loadUserTable(); this.fillUserDeptSelect(); }
         } else if (page === 'manage') {
             view.innerHTML = UI.managePage(subId);
-            if (subId === 'tab1') this.initForm4();
         }
         lucide.createIcons();
     },
@@ -66,7 +105,7 @@ const App = {
         if (!val) return alert("กรุณาระบุข้อมูล");
         this.showLoader();
         await db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col).add({ name: val, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        document.getElementById(inputId).value = ''; this.loadMasterTable(); this.hideLoader();
+        document.getElementById(inputId).value = ''; this.loadAdminAllTables(); this.hideLoader();
     },
 
     async saveUnits() {
@@ -109,6 +148,10 @@ const App = {
 
         // โหลดตารางกรณี 1 (เผื่อพร้อมแสดงเมื่อเลือกกรณี)
         this.loadAnalysisCase1Table();
+
+        // โหลดตารางข้อมูลตั้งต้น (ทุกหมวด) + เติม Dropdown หน่วยงานสำหรับสาขา/งาน
+        this.fillDeptSelectForBranches();
+        this.loadAdminAllTables();
     },
 
     // --- หมวดข้อมูลยุทธศาสตร์และตัวชี้วัด (ความสัมพันธ์ 9-12) ---
@@ -150,6 +193,7 @@ const App = {
                 document.getElementById('strat-lvl-9').value = '';
                 alert("บันทึกสำเร็จ");
                 await this.fillStratPlanSelect();
+                await this.refreshAdminStratLinks();
                 this.hideLoader();
                 return;
             }
@@ -166,6 +210,7 @@ const App = {
                 document.getElementById('strat-lvl-10').value = '';
                 alert("เชื่อมโยงสำเร็จ");
                 await this.fillStratIssueSelect(planId);
+                await this.refreshAdminStratLinks();
                 this.hideLoader();
                 return;
             }
@@ -182,6 +227,7 @@ const App = {
                 document.getElementById('strat-lvl-11').value = '';
                 alert("เชื่อมโยงสำเร็จ");
                 await this.fillBscSelect(issueId);
+                await this.refreshAdminStratLinks();
                 this.hideLoader();
                 return;
             }
@@ -197,6 +243,7 @@ const App = {
                     .add({ bscId, name, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser?.name || '' });
                 document.getElementById('strat-lvl-12').value = '';
                 alert("เชื่อมโยงสำเร็จ");
+                await this.refreshAdminStratLinks();
                 this.hideLoader();
                 return;
             }
@@ -503,10 +550,726 @@ const App = {
         this.hideLoader();
     },
 
+
+// =========================
+// Admin Setup: ตารางข้อมูลตั้งต้น (แสดงข้อมูลจริงจาก Firestore)
+// =========================
+getAdminColRef(key) {
+    return db.collection('artifacts').doc(appId).collection('public').doc('data').collection(key);
+},
+
+ensureAdminTableState(key) {
+    if (!adminTableState[key]) adminTableState[key] = { page: 1, limit: 10, fullData: [], searchQuery: '' };
+    return adminTableState[key];
+},
+
+async loadAdminTable(key) {
+    try {
+        const st = this.ensureAdminTableState(key);
+        const colRef = this.getAdminColRef(key);
+        let snap;
+        try {
+            snap = await colRef.orderBy('createdAt', 'desc').get();
+        } catch {
+            snap = await colRef.get();
+        }
+        st.fullData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (st.page < 1) st.page = 1;
+        this.renderAdminTable(key);
+    } catch (e) {
+        console.error("loadAdminTable error", key, e);
+    }
+},
+
+async loadAdminAllTables() {
+    if (typeof db === 'undefined') return;
+
+    const keys = ['budget_types','years','items','categories','depts','branches','strat_plans','strat_issues','bsc_dims','strat_kpis'];
+    for (const k of keys) await this.loadAdminTable(k);
+
+    // สร้าง map สำหรับการแสดงชื่อความเชื่อมโยง
+    this.adminBuildStratMaps();
+
+    // สร้าง "ตารางรวม" แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง (ฉบับแผน > ยุทธศาสตร์ > มิติ > ตัวชี้วัด)
+    this.adminBuildStratLinks();
+
+    // render ตารางที่อ้างอิง map
+    ['strat_issues','bsc_dims','strat_kpis','strat_links'].forEach(k => this.renderAdminTable(k));
+},
+
+
+async refreshAdminStratLinks() {
+    // รีเฟรชตาราง "แผนพัฒนาฯ และความเชื่อมโยง" ให้ดึงข้อมูลจริงล่าสุดจากฐานข้อมูล
+    // (แก้เคสเพิ่มข้อมูลแล้วไม่แสดง เพราะ state ยังไม่ reload)
+    if (typeof db === 'undefined') return;
+    await this.loadAdminTable('strat_plans');
+    await this.loadAdminTable('strat_issues');
+    await this.loadAdminTable('bsc_dims');
+    await this.loadAdminTable('strat_kpis');
+    this.adminBuildStratMaps();
+    this.adminBuildStratLinks();
+    ['strat_links','strat_issues','bsc_dims','strat_kpis'].forEach(k => this.renderAdminTable(k));
+},
+
+adminBuildStratMaps() {
+    const planMap = {};
+    const issueMap = {};
+    const dimMap = {};
+
+    (adminTableState['strat_plans']?.fullData || []).forEach(x => { planMap[x.id] = x.name || x.title || '-'; });
+    (adminTableState['strat_issues']?.fullData || []).forEach(x => { issueMap[x.id] = x.name || x.title || '-'; });
+    (adminTableState['bsc_dims']?.fullData || []).forEach(x => { dimMap[x.id] = x.name || x.title || '-'; });
+
+    adminTableState._planMap = planMap;
+    adminTableState._issueMap = issueMap;
+    adminTableState._dimMap = dimMap;
+},
+
+adminBuildStratLinks() {
+    // แถวในตารางรวม = ระดับ "ตัวชี้วัด" (strat_kpis) แล้วไล่ขึ้นไปหา มิติ/ยุทธศาสตร์/ฉบับแผน
+    // รองรับ field ได้หลายแบบ (กัน schema ต่างกันแล้วขึ้น "-")
+    const planMap = adminTableState._planMap || {};
+    const issueMap = adminTableState._issueMap || {};
+    const dimMap = adminTableState._dimMap || {};
+
+    const issues = adminTableState['strat_issues']?.fullData || [];
+    const dims = adminTableState['bsc_dims']?.fullData || [];
+    const kpis = adminTableState['strat_kpis']?.fullData || [];
+
+    const issueById = {};
+    const dimById = {};
+    issues.forEach(x => { issueById[x.id] = x; });
+    dims.forEach(x => { dimById[x.id] = x; });
+
+    const rows = kpis.map(k => {
+        const dimId = k.bscId || k.dimId || k.parentId || '';
+        const dim = dimById[dimId] || {};
+        const issueId = dim.issueId || dim.stratIssueId || dim.parentId || '';
+        const issue = issueById[issueId] || {};
+        const planId = issue.planId || issue.stratPlanId || issue.parentId || '';
+
+        const planName = planMap[planId] || '-';
+        const issueName = issueMap[issueId] || issueMap[issue.id] || issue.name || issue.title || '-';
+        const dimName = dimMap[dimId] || dimMap[dim.id] || dim.name || dim.title || '-';
+        const kpiName = k.name || k.title || '-';
+
+        return {
+            id: k.id,        // ใช้ id ของตัวชี้วัดเป็นหลัก
+            kpiId: k.id,
+            planId,
+            issueId,
+            dimId,
+            planName,
+            issueName,
+            dimName,
+            name: kpiName,
+            createdAt: k.createdAt || k.updatedAt
+        };
+    });
+
+    // sort ใหม่ล่าสุดก่อน
+    rows.sort((a,b) => ((b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+
+    const st = this.ensureAdminTableState('strat_links');
+    st.fullData = rows;
+    if (st.page < 1) st.page = 1;
+},
+
+adminFilter(key) {
+    const st = this.ensureAdminTableState(key);
+    const el = document.getElementById(`adm-search-${key}`);
+    st.searchQuery = (el?.value || '').trim().toLowerCase();
+    st.page = 1;
+    this.renderAdminTable(key);
+},
+
+adminPrevPage(key) {
+    const st = this.ensureAdminTableState(key);
+    if (st.page > 1) st.page -= 1;
+    this.renderAdminTable(key);
+},
+
+adminNextPage(key) {
+    const st = this.ensureAdminTableState(key);
+    const total = this.adminGetFilteredData(key).length;
+    const maxPage = Math.max(1, Math.ceil(total / st.limit));
+    if (st.page < maxPage) st.page += 1;
+    this.renderAdminTable(key);
+},
+
+adminGetFilteredData(key) {
+    const st = this.ensureAdminTableState(key);
+    const q = st.searchQuery || '';
+    const data = st.fullData || [];
+    if (!q) return data;
+
+    return data.filter(x => {
+        const text = [
+            x.name, x.title, x.deptName, x.parentName, x.note,
+            x.planName, x.issueName, x.dimName,
+            x.year, x.status
+        ].filter(Boolean).join(' ').toLowerCase();
+        return text.includes(q);
+    });
+},
+
+adminFmtDate(ts) {
+    try {
+        if (!ts) return '-';
+        if (ts.toDate) ts = ts.toDate();
+        const d = (ts instanceof Date) ? ts : new Date(ts);
+        if (isNaN(d.getTime())) return '-';
+        const dd = String(d.getDate()).padStart(2,'0');
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const yy = d.getFullYear();
+        return `${dd}/${mm}/${yy}`;
+    } catch { return '-'; }
+},
+
+renderAdminTable(key) {
+    const st = this.ensureAdminTableState(key);
+    const tbody = document.getElementById(`adm-tbody-${key}`);
+    const pageEl = document.getElementById(`adm-page-${key}`);
+    if (!tbody || !pageEl) return;
+
+    const planMap = adminTableState._planMap || {};
+    const issueMap = adminTableState._issueMap || {};
+    const dimMap = adminTableState._dimMap || {};
+
+    const data = this.adminGetFilteredData(key);
+    const total = data.length;
+    const maxPage = Math.max(1, Math.ceil(total / st.limit));
+    if (st.page > maxPage) st.page = maxPage;
+
+    const start = (st.page - 1) * st.limit;
+    const pageData = data.slice(start, start + st.limit);
+    pageEl.textContent = `หน้า ${st.page} / ${maxPage}`;
+
+    const iconBtn = (type, onclick) => {
+        const cls = type === 'edit'
+            ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+            : 'bg-rose-50 text-rose-600 hover:bg-rose-100';
+        const ic = type === 'edit' ? 'pencil' : 'trash-2';
+        return `<button onclick="${onclick}" class="p-2 rounded-lg ${cls} transition-all"><i data-lucide="${ic}" class="w-4 h-4"></i></button>`;
+    };
+
+    const col = (txt, cls='') => `<td class="px-6 py-4 ${cls}">${txt ?? '-'}</td>`;
+    const colSm = (txt, cls='') => `<td class="px-4 py-3 text-[12px] ${cls}">${txt ?? '-'}</td>`;
+
+    const rows = pageData.map((x, i) => {
+        const idx = start + i + 1;
+        const name = x.name || x.title || x.year || '-';
+        const createdAt = this.adminFmtDate(x.createdAt || x.updatedAt);
+
+
+        if (key === 'strat_links') {
+            return `<tr>
+                ${colSm(idx)}
+                ${colSm(x.planName || '-', 'font-bold text-indigo-900')}
+                ${colSm(x.issueName || '-', 'font-bold text-indigo-900')}
+                ${colSm(x.dimName || '-', 'font-bold text-indigo-900')}
+                ${colSm(name)}
+                ${colSm(createdAt)}
+                <td class="px-4 py-3 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
+                        ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        if (key === 'branches') {
+            return `<tr>
+                ${col(idx)}
+                ${col(x.deptName || '-')}
+                ${col(name)}
+                ${col(createdAt)}
+                <td class="px-6 py-4 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
+                        ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+
+        if (key === 'years') {
+            const yearVal = x.year ?? x.name ?? x.title ?? '-';
+            const status = x.status ?? x.state ?? '-';
+            const note = x.note ?? x.remark ?? '-';
+            return `<tr>
+                ${colSm(idx)}
+                ${colSm(yearVal, 'font-bold text-indigo-900')}
+                ${colSm(status)}
+                ${colSm(note)}
+                ${colSm(createdAt)}
+                <td class="px-4 py-3 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
+                        ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        if (key === 'strat_issues') {
+            const parent = planMap[x.planId] || planMap[x.parentId] || x.parentName || '-';
+            return `<tr>
+                ${colSm(idx)}
+                ${colSm(parent, 'font-bold text-indigo-900')}
+                ${colSm(name)}
+                ${colSm(createdAt)}
+                <td class="px-4 py-3 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
+                        ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        if (key === 'bsc_dims') {
+            const parent = issueMap[x.issueId] || issueMap[x.parentId] || x.parentName || '-';
+            return `<tr>
+                ${colSm(idx)}
+                ${colSm(parent, 'font-bold text-indigo-900')}
+                ${colSm(name)}
+                ${colSm(createdAt)}
+                <td class="px-4 py-3 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
+                        ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        if (key === 'strat_kpis') {
+            const parent = dimMap[x.bscId] || dimMap[x.parentId] || x.parentName || '-';
+            return `<tr>
+                ${colSm(idx)}
+                ${colSm(parent, 'font-bold text-indigo-900')}
+                ${colSm(name)}
+                ${colSm(createdAt)}
+                <td class="px-4 py-3 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
+                        ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        if (['strat_plans'].includes(key)) {
+            return `<tr>
+                ${colSm(idx)}
+                ${colSm(name)}
+                ${colSm(createdAt)}
+                <td class="px-4 py-3 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
+                        ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
+                    </div>
+                </td>
+            </tr>`;
+        }
+
+        return `<tr>
+            ${col(idx)}
+            ${col(name)}
+            ${col(createdAt)}
+            <td class="px-6 py-4 text-center">
+                <div class="flex items-center justify-center gap-2">
+                    ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
+                    ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    tbody.innerHTML = rows || `<tr><td class="px-6 py-8 text-center text-gray-300 italic" colspan="10">ไม่มีข้อมูล</td></tr>`;
+    lucide.createIcons();
+},
+
+adminCloseEditModal() {
+    const root = document.getElementById('admin-edit-modal');
+    if (!root) return;
+    root.className = 'hidden';
+    root.innerHTML = '';
+    document.body.classList.remove('overflow-hidden');
+},
+
+adminShowEditModal(innerHtml) {
+    const root = document.getElementById('admin-edit-modal');
+    if (!root) return;
+    root.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+    root.innerHTML = `
+      <div class="absolute inset-0 bg-black/40" onclick="App.adminCloseEditModal()"></div>
+      <div class="relative w-full max-w-3xl bg-white rounded-[2rem] shadow-2xl border border-purple-50 overflow-hidden">
+        ${innerHtml}
+      </div>
+    `;
+    document.body.classList.add('overflow-hidden');
+    lucide.createIcons();
+},
+
+adminModalSetIssueOptions(planId, selectedIssueId) {
+    const issues = adminTableState['strat_issues']?.fullData || [];
+    const sel = document.getElementById('adm-edit-issue');
+    if (!sel) return;
+    const rows = issues.filter(x => (x.planId || x.parentId || '') === planId);
+    sel.innerHTML = rows.map(r => `<option value="${r.id}">${r.name || r.title || '-'}</option>`).join('');
+    if (selectedIssueId && rows.some(r => r.id === selectedIssueId)) sel.value = selectedIssueId;
+},
+
+adminModalSetDimOptions(issueId, selectedDimId) {
+    const dims = adminTableState['bsc_dims']?.fullData || [];
+    const sel = document.getElementById('adm-edit-dim');
+    if (!sel) return;
+    const rows = dims.filter(x => (x.issueId || x.parentId || '') === issueId);
+    sel.innerHTML = rows.map(r => `<option value="${r.id}">${r.name || r.title || '-'}</option>`).join('');
+    if (selectedDimId && rows.some(r => r.id === selectedDimId)) sel.value = selectedDimId;
+},
+
+async adminModalSave(key, id) {
+    try {
+        const realKey = (key === 'strat_links') ? 'strat_kpis' : key;
+
+        // helper
+        const sv = (id) => document.getElementById(id)?.value ?? '';
+
+        if (key === 'years') {
+            const year = sv('adm-edit-year').trim();
+            const status = sv('adm-edit-status').trim();
+            const note = sv('adm-edit-note').trim();
+            if (!year) return alert('โปรดระบุปี พ.ศ.');
+
+            await this.getAdminColRef('years').doc(id).update({
+                year,
+                name: String(year), // เผื่อระบบอื่นเรียก name
+                status: status || '',
+                note: note || '',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else if (key === 'branches') {
+            const deptId = sv('adm-edit-dept');
+            const deptName = document.getElementById('adm-edit-dept')?.selectedOptions?.[0]?.textContent?.trim() || '';
+            const name = sv('adm-edit-name').trim();
+            if (!deptId) return alert('โปรดเลือกหน่วยงาน');
+            if (!name) return alert('โปรดระบุสาขา/งาน');
+
+            await this.getAdminColRef('branches').doc(id).update({
+                deptId,
+                deptName,
+                name,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else if (key === 'strat_links') {
+            // แก้ไขข้อความได้ทุกช่อง (ไม่ใช้ dropdown) และบันทึกลงฐานข้อมูลจริง
+            const row = (adminTableState['strat_links']?.fullData || []).find(x => x.id === id) || {};
+            const planId = row.planId || '';
+            const issueId = row.issueId || '';
+            const dimId = row.dimId || '';
+
+            const planName = sv('adm-edit-plan-name').trim();
+            const issueName = sv('adm-edit-issue-name').trim();
+            const dimName = sv('adm-edit-dim-name').trim();
+            const kpiName = sv('adm-edit-kpi-name').trim();
+
+            if (!planName) return alert('โปรดระบุฉบับแผน');
+            if (!issueName) return alert('โปรดระบุประเด็นยุทธศาสตร์');
+            if (!dimName) return alert('โปรดระบุมิติ');
+            if (!kpiName) return alert('โปรดระบุตัวชี้วัด');
+
+            const ts = firebase.firestore.FieldValue.serverTimestamp();
+
+            // อัปเดตชื่อทุกระดับตาม id เดิม
+            if (planId) {
+                await this.getAdminColRef('strat_plans').doc(planId).update({ name: planName, updatedAt: ts });
+            }
+            if (issueId) {
+                await this.getAdminColRef('strat_issues').doc(issueId).update({ name: issueName, updatedAt: ts });
+            }
+            if (dimId) {
+                await this.getAdminColRef('bsc_dims').doc(dimId).update({ name: dimName, updatedAt: ts });
+            }
+
+            // ตัวชี้วัด (doc id = id)
+            await this.getAdminColRef('strat_kpis').doc(id).update({
+                name: kpiName,
+                updatedAt: ts
+            });
+        } else {
+            const name = sv('adm-edit-name').trim();
+            if (!name) return alert('ห้ามเว้นว่าง');
+            await this.getAdminColRef(realKey).doc(id).update({
+                name,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        // reload + rebuild maps/links
+        await this.loadAdminTable(realKey);
+        if (key === 'strat_links') await this.loadAdminTable('strat_kpis');
+
+        if (['strat_plans','strat_issues','bsc_dims'].includes(realKey)) this.adminBuildStratMaps();
+        this.adminBuildStratLinks();
+        ['strat_issues','bsc_dims','strat_kpis','strat_links'].forEach(k => this.renderAdminTable(k));
+
+        this.adminCloseEditModal();
+    } catch (e) {
+        console.error("adminModalSave error", e);
+        alert('บันทึกไม่สำเร็จ');
+    }
+},
+
+async adminEdit(key, id) {
+    try {
+        const realKey = (key === 'strat_links') ? 'strat_kpis' : key;
+
+        // หา item จาก state
+        const st = this.ensureAdminTableState(key);
+        const item = (st.fullData || []).find(x => x.id === id);
+        if (!item) return;
+
+        // สำหรับ strat_links ต้องเอา doc จริงของ strat_kpis เพื่อใช้ bscId
+        const kpiDoc = (key === 'strat_links')
+            ? (adminTableState['strat_kpis']?.fullData || []).find(x => x.id === id) || {}
+            : item;
+
+        // ===== modal content by key =====
+        let title = 'แก้ไขข้อมูล';
+        let formHtml = '';
+
+        if (key === 'years') {
+            title = 'แก้ไขปีงบประมาณ';
+            const yearVal = kpiDoc.year ?? kpiDoc.name ?? '';
+            const statusVal = kpiDoc.status ?? kpiDoc.state ?? '';
+            const noteVal = kpiDoc.note ?? kpiDoc.remark ?? '';
+            formHtml = `
+              <div class="p-6 md:p-8 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-bold text-purple-600">แก้ไขข้อมูล</div>
+                  <div class="text-xl font-black text-slate-900">${title}</div>
+                </div>
+                <button class="p-2 rounded-xl hover:bg-gray-100" onclick="App.adminCloseEditModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+              </div>
+              <div class="p-6 md:p-8 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label class="text-xs font-bold text-slate-600">ปี พ.ศ.</label>
+                    <input id="adm-edit-year" class="input-flat w-full mt-2" value="${yearVal}">
+                  </div>
+                  <div>
+                    <label class="text-xs font-bold text-slate-600">สถานะปีงบประมาณ</label>
+                    <select id="adm-edit-status" class="input-flat w-full mt-2">
+                      <option value="">-</option>
+                      <option value="เปิดใช้งาน">เปิดใช้งาน</option>
+                      <option value="ปิดแล้ว">ปิดแล้ว</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-xs font-bold text-slate-600">หมายเหตุ</label>
+                    <input id="adm-edit-note" class="input-flat w-full mt-2" value="${noteVal}">
+                  </div>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                  <button class="px-5 py-3 rounded-xl bg-gray-100 font-bold text-sm" onclick="App.adminCloseEditModal()">ยกเลิก</button>
+                  <button class="px-6 py-3 rounded-xl bg-purple-600 text-white font-black text-sm shadow-lg" onclick="App.adminModalSave('${key}','${id}')">บันทึก</button>
+                </div>
+              </div>
+            `;
+        } else if (key === 'branches') {
+            title = 'แก้ไขสาขา / งาน';
+            const deptId = kpiDoc.deptId || '';
+            const nameVal = kpiDoc.name || kpiDoc.title || '';
+            const depts = adminTableState['depts']?.fullData || [];
+            const deptOptions = depts.map(d => `<option value="${d.id}">${d.name || d.title || '-'}</option>`).join('');
+
+            formHtml = `
+              <div class="p-6 md:p-8 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-bold text-purple-600">แก้ไขข้อมูล</div>
+                  <div class="text-xl font-black text-slate-900">${title}</div>
+                </div>
+                <button class="p-2 rounded-xl hover:bg-gray-100" onclick="App.adminCloseEditModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+              </div>
+              <div class="p-6 md:p-8 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-xs font-bold text-slate-600">หน่วยงาน</label>
+                    <select id="adm-edit-dept" class="input-flat w-full mt-2">${deptOptions}</select>
+                  </div>
+                  <div>
+                    <label class="text-xs font-bold text-slate-600">สาขา / งาน</label>
+                    <input id="adm-edit-name" class="input-flat w-full mt-2" value="${nameVal}">
+                  </div>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                  <button class="px-5 py-3 rounded-xl bg-gray-100 font-bold text-sm" onclick="App.adminCloseEditModal()">ยกเลิก</button>
+                  <button class="px-6 py-3 rounded-xl bg-purple-600 text-white font-black text-sm shadow-lg" onclick="App.adminModalSave('${key}','${id}')">บันทึก</button>
+                </div>
+              </div>
+            `;
+        } else if (key === 'strat_links') {
+            title = 'แก้ไขความเชื่อมโยงแผนพัฒนาฯ';
+            const plans = adminTableState['strat_plans']?.fullData || [];
+            const issues = adminTableState['strat_issues']?.fullData || [];
+            const dims = adminTableState['bsc_dims']?.fullData || [];
+
+            // โซ่ความเชื่อมโยงจริง (ตาม id เดิม)
+            const dimId = kpiDoc.bscId || kpiDoc.dimId || kpiDoc.parentId || '';
+            const dim = (dims.find(d => d.id === dimId) || {});
+            const issueId = dim.issueId || dim.parentId || '';
+            const issue = (issues.find(i => i.id === issueId) || {});
+            const planId = issue.planId || issue.parentId || '';
+            const plan = (plans.find(p => p.id === planId) || {});
+
+            const planName = (plan.name || plan.title || '').trim();
+            const issueName = (issue.name || issue.title || '').trim();
+            const dimName = (dim.name || dim.title || '').trim();
+            const kpiName = (kpiDoc.name || kpiDoc.title || '').trim();
+
+            formHtml = `
+              <div class="p-6 md:p-8 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-bold text-purple-600">แก้ไขข้อมูล</div>
+                  <div class="text-xl font-black text-slate-900">${title}</div>
+                  <div class="text-[11px] font-bold text-slate-500 mt-1">แก้ไขข้อความได้ทุกช่อง และบันทึกลงฐานข้อมูล</div>
+                </div>
+                <button class="p-2 rounded-xl hover:bg-gray-100" onclick="App.adminCloseEditModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+              </div>
+              <div class="p-6 md:p-8 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label class="text-xs font-bold text-slate-600">ฉบับแผน</label>
+                    <input id="adm-edit-plan-name" class="input-flat w-full mt-2" value="" placeholder="พิมพ์ฉบับแผน...">
+                  </div>
+                  <div>
+                    <label class="text-xs font-bold text-slate-600">ประเด็นยุทธศาสตร์</label>
+                    <input id="adm-edit-issue-name" class="input-flat w-full mt-2" value="" placeholder="พิมพ์ประเด็นยุทธศาสตร์...">
+                  </div>
+                  <div>
+                    <label class="text-xs font-bold text-slate-600">มิติ</label>
+                    <input id="adm-edit-dim-name" class="input-flat w-full mt-2" value="" placeholder="พิมพ์มิติ...">
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs font-bold text-slate-600">ตัวชี้วัด</label>
+                  <input id="adm-edit-kpi-name" class="input-flat w-full mt-2" value="" placeholder="พิมพ์ตัวชี้วัด...">
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                  <button class="px-5 py-3 rounded-xl bg-gray-100 font-bold text-sm" onclick="App.adminCloseEditModal()">ยกเลิก</button>
+                  <button class="px-6 py-3 rounded-xl bg-purple-600 text-white font-black text-sm shadow-lg" onclick="App.adminModalSave('${key}','${id}')">บันทึก</button>
+                </div>
+              </div>
+            `;
+            this.adminShowEditModal(formHtml);
+            const setVal = (eid, v) => { const el = document.getElementById(eid); if (el) el.value = (v ?? ''); };
+            setVal('adm-edit-plan-name', planName);
+            setVal('adm-edit-issue-name', issueName);
+            setVal('adm-edit-dim-name', dimName);
+            setVal('adm-edit-kpi-name', kpiName);
+            return;
+        } else {
+            // default name editor
+            title = 'แก้ไขข้อมูล';
+            const oldName = kpiDoc.name || kpiDoc.title || kpiDoc.year || '';
+            formHtml = `
+              <div class="p-6 md:p-8 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-bold text-purple-600">แก้ไขข้อมูล</div>
+                  <div class="text-xl font-black text-slate-900">${title}</div>
+                </div>
+                <button class="p-2 rounded-xl hover:bg-gray-100" onclick="App.adminCloseEditModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+              </div>
+              <div class="p-6 md:p-8 space-y-4">
+                <div>
+                  <label class="text-xs font-bold text-slate-600">ชื่อข้อมูล</label>
+                  <input id="adm-edit-name" class="input-flat w-full mt-2" value="${oldName}">
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                  <button class="px-5 py-3 rounded-xl bg-gray-100 font-bold text-sm" onclick="App.adminCloseEditModal()">ยกเลิก</button>
+                  <button class="px-6 py-3 rounded-xl bg-purple-600 text-white font-black text-sm shadow-lg" onclick="App.adminModalSave('${key}','${id}')">บันทึก</button>
+                </div>
+              </div>
+            `;
+        }
+
+        this.adminShowEditModal(formHtml);
+
+        // post-set values for select status etc.
+        if (key === 'years') {
+            const statusEl = document.getElementById('adm-edit-status');
+            if (statusEl) statusEl.value = (kpiDoc.status ?? kpiDoc.state ?? '') || '';
+        }
+        if (key === 'branches') {
+            const deptEl = document.getElementById('adm-edit-dept');
+            if (deptEl && kpiDoc.deptId) deptEl.value = kpiDoc.deptId;
+        }
+    } catch (e) {
+        console.error("adminEdit error", e);
+        alert('แก้ไขไม่สำเร็จ');
+    }
+},
+
+async adminDelete(key, id) {
+    try {
+        const realKey = (key === 'strat_links') ? 'strat_kpis' : key;
+
+        const ok = confirm('ยืนยันลบข้อมูลนี้?');
+        if (!ok) return;
+
+        await this.getAdminColRef(realKey).doc(id).delete();
+        await this.loadAdminTable(realKey);
+        if (key === 'strat_links') await this.loadAdminTable('strat_kpis');
+        if (['strat_plans','strat_issues','bsc_dims'].includes(realKey)) this.adminBuildStratMaps();
+        this.adminBuildStratLinks();
+    } catch (e) {
+        console.error("adminDelete error", e);
+        alert('ลบไม่สำเร็จ');
+    }
+},
+
+async fillDeptSelectForBranches() {
+    try {
+        const sel = document.getElementById('m-dept-select');
+        if (!sel) return;
+        const snap = await this.getAdminColRef('depts').orderBy('name').get();
+        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        sel.innerHTML = rows.map(r => `<option value="${r.id}">${r.name || '-'}</option>`).join('');
+    } catch (e) {
+        console.error("fillDeptSelectForBranches error", e);
+    }
+},
+
     // ฟังก์ชันเดิมของโครงสร้างองค์กร
     async saveBranch() {
-       alert("เชื่อมโยงสำเร็จ");
-    },
+    const deptId = document.getElementById('m-dept-select')?.value;
+    const deptName = document.getElementById('m-dept-select')?.selectedOptions?.[0]?.textContent?.trim() || '';
+    const name = document.getElementById('m-branch-name')?.value?.trim();
+
+    if (!deptId) return alert('โปรดเลือกหน่วยงาน');
+    if (!name) return alert('โปรดระบุสาขา/งาน');
+
+    this.showLoader();
+    this.getAdminColRef('branches').add({
+        deptId,
+        deptName,
+        name,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        document.getElementById('m-branch-name').value = '';
+        this.loadAdminTable('branches');
+        alert('เชื่อมโยงสำเร็จ');
+    }).catch(err => {
+        console.error(err);
+        alert('บันทึกไม่สำเร็จ');
+    }).finally(() => this.hideLoader());
+},
+
 
     async loadMasterTable() {
         const tbody = document.getElementById('master-table-body');
@@ -532,40 +1295,73 @@ const App = {
 
     // --- User Ops ---
     async saveUser() {
+        const editId = document.getElementById('u-edit-id')?.value?.trim();
         const userData = {
             username: document.getElementById('u-user').value.trim(),
             password: document.getElementById('u-pass').value.trim(),
             fullname: document.getElementById('u-fullname').value.trim(),
             role: document.getElementById('u-role').value,
             position: document.getElementById('u-pos').value.trim(),
-            dept: document.getElementById('u-dept-select').value,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            dept: document.getElementById('u-dept-select').value
         };
-        if(!userData.username || !userData.password) return alert("กรอกข้อมูลสำคัญด้วยจ้า");
+
+        if (!userData.username || !userData.password) return alert("กรอกข้อมูลสำคัญด้วยจ้า");
+
         this.showLoader();
-        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users').add(userData);
-        this.resetUserForm(); this.loadUserTable(); this.hideLoader();
+        const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users');
+        try {
+            if (editId) {
+                await col.doc(editId).set({
+                    ...userData,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } else {
+                await col.add({
+                    ...userData,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            this.resetUserForm();
+            await this.loadUserTable();
+        } finally {
+            this.hideLoader();
+        }
     },
 
     async loadUserTable() {
         const tbody = document.getElementById('user-list-body');
         if (!tbody) return;
         this.showLoader();
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users').get();
+        const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users');
+        const snap = await col.orderBy('createdAt', 'desc').get().catch(async () => {
+            // เผื่อบางเอกสารยังไม่มี createdAt
+            return await col.get();
+        });
+
+        const iconBtn = (type, onclick) => {
+            const cls = type === 'edit'
+                ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                : 'bg-rose-50 text-rose-600 hover:bg-rose-100';
+            const ic = type === 'edit' ? 'pencil' : 'trash-2';
+            return `<button onclick="${onclick}" class="p-2 rounded-lg ${cls} transition-all"><i data-lucide="${ic}" class="w-4 h-4"></i></button>`;
+        };
+
         tbody.innerHTML = snap.docs.map(doc => {
-            const d = doc.data();
+            const d = doc.data() || {};
+            const createdAt = this.adminFmtDate(d.createdAt || d.updatedAt);
             return `
             <tr class="hover:bg-purple-50/30 transition-all">
-                <td class="px-6 py-4 font-bold text-indigo-600">${d.username}</td>
-                <td class="px-6 py-4 font-mono text-purple-700 tracking-wider">${d.password}</td> 
-                <td class="px-6 py-4">${d.fullname}</td>
-                <td class="px-6 py-4 text-center"><span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs font-bold">${d.role}</span></td>
-                <td class="px-6 py-4">${d.position}</td>
-                <td class="px-6 py-4">${d.dept}</td>
+                <td class="px-6 py-4 font-bold text-indigo-600">${d.username || '-'}</td>
+                <td class="px-6 py-4 font-mono text-purple-700 tracking-wider">${d.password || '-'}</td> 
+                <td class="px-6 py-4">${d.fullname || '-'}</td>
+                <td class="px-6 py-4 text-center"><span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs font-bold">${d.role || '-'}</span></td>
+                <td class="px-6 py-4">${d.position || '-'}</td>
+                <td class="px-6 py-4">${d.dept || '-'}</td>
+                <td class="px-6 py-4">${createdAt}</td>
                 <td class="px-6 py-4 text-center">
                     <div class="flex justify-center gap-2">
-                        <button class="text-amber-500 hover:bg-amber-50 p-2 rounded-lg transition-all"><i data-lucide="edit-3" size="18"></i></button>
-                        <button class="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-all"><i data-lucide="trash-2" size="18"></i></button>
+                        ${iconBtn('edit', `App.openUserEditModal('${doc.id}')`)}
+                        ${iconBtn('del', `App.deleteUser('${doc.id}')`)}
                     </div>
                 </td>
             </tr>`;
@@ -574,745 +1370,140 @@ const App = {
         this.hideLoader();
     },
 
+    // --- User Edit Modal ---
+    async openUserEditModal(id) {
+        try {
+            const modalRoot = document.getElementById('user-edit-modal');
+            if (!modalRoot) return alert('ไม่พบพื้นที่แสดงฟอร์มแก้ไข');
 
-    // =========================
-    // Form (ง.4) : Tab 1 Only
-    // =========================
-    async initForm4() {
-        // ป้องกัน: เรียกเฉพาะตอนหน้า (ง.4) render แล้วเท่านั้น
-        const deptSel = document.getElementById('f-dept');
-        if (!deptSel) return;
+            const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users');
+            const doc = await col.doc(id).get();
+            if (!doc.exists) return alert('ไม่พบข้อมูลผู้ใช้งาน');
+            const d = doc.data() || {};
 
-        // เติม dropdown master
-        await this.form4FillDepts();
-        await this.form4FillBudgetSources();
-        await this.form4FillCategories();
-        await this.form4FillUnits();
-        await this.form4FillStratIssue();
-        await this.form4FillBscDims();
-        await this.form4FillStratKpis();
+            // สร้างตัวเลือกหน่วยงานจาก select หลัก (ซิงค์ให้เหมือนกัน)
+            const deptSel = document.getElementById('u-dept-select');
+            const deptOptions = deptSel ? deptSel.innerHTML : '<option value="">เลือกหน่วยงาน</option>';
 
-        // เติม dropdown บูรณาการ (15)
-        await this.form4FillIntegrationDropdowns();
-
-        // ผูก event: dept -> branch
-        deptSel.onchange = () => this.form4FillBranches(deptSel.value);
-
-        // ตัวนับตัวอักษร
-        this.bindCounter('f-obj', 'cnt-obj');
-        this.bindCounter('f-strategy', 'cnt-strategy');
-        this.bindCounter('f-need', 'cnt-need');
-        this.bindCounter('f-objective2', 'cnt-objective2');
-
-        // ตั้งต้นตารางซ่อมบำรุง 2 แถว
-        this.form4EnsureRepairRows(2);
-
-        // ตั้งต้น Spec group (19) อย่างน้อย 1 กรุ๊ป
-        this.form4EnsureSpecGroups(1);
-
-        // ตัวนับ 22.2
-        this.bindCounter('f-note-other-text', 'cnt-note-other');
-
-        // พรีวิวภาพ + check ขนาด (18)
-        this.bindImagePreview('f-install-img1', 'prev-install-1', 2);
-        this.bindImagePreview('f-install-img2', 'prev-install-2', 2);
-        this.bindImagePreview('f-equip-img1', 'prev-equip-1', 2);
-        this.bindImagePreview('f-equip-img2', 'prev-equip-2', 2);
-        this.bindImagePreview('f-equip-img3', 'prev-equip-3', 2);
-        this.bindImagePreview('f-equip-img4', 'prev-equip-4', 2);
-
-        // PDF ขนาดไม่เกิน 10MB
-        const pdf = document.getElementById('f-repair-pdf');
-        if (pdf) {
-            pdf.onchange = () => {
-                const f = pdf.files?.[0];
-                if (!f) return;
-                const max = 10 * 1024 * 1024;
-                if (f.size > max) { pdf.value = ''; alert('ไฟล์ PDF ต้องไม่เกิน 10MB'); }
-            };
-        }
-
-        // PDF ใบเสนอราคา (22.1) ขนาดไม่เกิน 20MB
-        const qpdf = document.getElementById('f-quote-pdf');
-        if (qpdf) {
-            qpdf.onchange = () => {
-                const f = qpdf.files?.[0];
-                if (!f) return;
-                const max = 20 * 1024 * 1024;
-                if (f.size > max) { qpdf.value = ''; alert('ไฟล์ PDF (ใบเสนอราคา) ต้องไม่เกิน 20MB'); }
-            };
-        }
-
-        // hint สิทธิ์ข้อ 10
-        const hint = document.getElementById('kpi-role-hint');
-        if (hint) {
-            const role = currentUser?.role || 'staff_dept';
-            hint.classList.toggle('hidden', !(role === 'admin' || role === 'staff_dept'));
-        }
-
-        // การวิเคราะห์ครุภัณฑ์ (24) - เฉพาะหน้า (ง.4)
-        this.initAnalysisCaseSelector();
-        this.initAnalysisCase1UI();
-
-        lucide.createIcons();
-    },
-
-    // ---------- Spec (19) ----------
-    form4EnsureSpecGroups(n = 1) {
-        const box = document.getElementById('f-spec-groups');
-        if (!box) return;
-        if (box.children.length >= n) return;
-        while (box.children.length < n) this.form4AddSpecGroup();
-    },
-
-    form4AddSpecGroup(data = {}) {
-        const box = document.getElementById('f-spec-groups');
-        if (!box) return;
-        const idx = box.children.length + 1;
-        const unitOptions = document.getElementById('f-kpi-unit')?.innerHTML || '<option value="">เลือกหน่วยนับ</option>';
-
-        const wrap = document.createElement('div');
-        wrap.className = 'bg-white p-6 rounded-[1.5rem] border border-indigo-100';
-        wrap.dataset.idx = String(idx);
-        wrap.innerHTML = `
-            <div class="flex items-center justify-between gap-4 mb-4">
-                <div class="font-black text-indigo-900">ชื่อรายการประกอบที่ ${idx}</div>
-                <button type="button" class="no-print text-rose-600 font-bold text-xs px-3 py-2 rounded-xl border border-rose-100 hover:bg-rose-50" data-act="remove">ลบกรุ๊ป</button>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                <div class="md:col-span-5">
-                    <label class="text-[11px] font-bold text-gray-500">ชื่อรายการประกอบ</label>
-                    <input class="input-flat w-full bg-gray-50 f-spec-name" placeholder="ชื่อรายการประกอบ" value="${data.name || ''}">
+            modalRoot.innerHTML = `
+            <div class="fixed inset-0 z-[999] flex items-center justify-center">
+                <div class="absolute inset-0 bg-black/40" onclick="App.closeUserEditModal()"></div>
+                <div class="relative w-[92vw] max-w-3xl bg-white rounded-[2rem] shadow-2xl border border-purple-100 overflow-hidden">
+                    <div class="px-8 py-6 border-b border-gray-100 flex items-start justify-between">
+                        <div>
+                            <div class="text-sm font-bold text-purple-600">แก้ไขข้อมูล</div>
+                            <div class="text-2xl font-black text-gray-800">แก้ไขผู้ใช้งานระบบ</div>
+                            <div class="text-xs text-gray-500 mt-1">แก้ไขได้ทุกช่อง แล้วกดบันทึกเพื่ออัปเดตฐานข้อมูลจริง</div>
+                        </div>
+                        <button class="h-10 w-10 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center" onclick="App.closeUserEditModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div class="p-8">
+                        <input type="hidden" id="um-id" value="${id}">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="space-y-1.5">
+                                <label class="text-[11px] font-bold text-gray-500 ml-1">Username</label>
+                                <input id="um-user" class="input-flat w-full bg-white" value="${(d.username||'').replace(/"/g,'&quot;')}" placeholder="ระบุชื่อผู้ใช้">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[11px] font-bold text-gray-500 ml-1">Password</label>
+                                <input id="um-pass" class="input-flat w-full bg-white" value="${(d.password||'').replace(/"/g,'&quot;')}" placeholder="ระบุรหัสผ่าน">
+                            </div>
+                            <div class="space-y-1.5 md:col-span-2">
+                                <label class="text-[11px] font-bold text-gray-500 ml-1">ชื่อ-นามสกุล</label>
+                                <input id="um-fullname" class="input-flat w-full bg-white" value="${(d.fullname||'').replace(/"/g,'&quot;')}" placeholder="ระบุชื่อ-สกุล">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[11px] font-bold text-gray-500 ml-1">สิทธิ์การใช้งาน</label>
+                                <select id="um-role" class="input-flat w-full bg-white font-bold">
+                                    <option value="admin">ผู้ดูแลระบบ</option>
+                                    <option value="manager">ผู้บริหาร</option>
+                                    <option value="staff_central">เจ้าหน้าที่ส่วนกลาง</option>
+                                    <option value="staff_dept">เจ้าหน้าที่หน่วยงาน</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[11px] font-bold text-gray-500 ml-1">ตำแหน่ง</label>
+                                <input id="um-pos" class="input-flat w-full bg-white" value="${(d.position||'').replace(/"/g,'&quot;')}" placeholder="ระบุตำแหน่ง">
+                            </div>
+                            <div class="space-y-1.5 md:col-span-2">
+                                <label class="text-[11px] font-bold text-gray-500 ml-1">หน่วยงาน</label>
+                                <select id="um-dept" class="input-flat w-full bg-white font-bold">${deptOptions}</select>
+                            </div>
+                        </div>
+                        <div class="mt-8 flex justify-end gap-3">
+                            <button class="h-[42px] px-6 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold" onclick="App.closeUserEditModal()">ยกเลิก</button>
+                            <button class="h-[42px] px-6 rounded-xl bg-[#10b981] hover:bg-green-600 text-white font-bold shadow-md flex items-center gap-2" onclick="App.saveUserEditModal()"><i data-lucide="check-circle" class="w-5 h-5"></i> บันทึก</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="md:col-span-2">
-                    <label class="text-[11px] font-bold text-gray-500">จำนวน</label>
-                    <input class="input-flat w-full bg-gray-50 f-spec-qty" placeholder="จำนวน" value="${data.qty || ''}">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="text-[11px] font-bold text-gray-500">หน่วยนับ</label>
-                    <select class="input-flat w-full bg-gray-50 f-spec-unit">${unitOptions}</select>
-                </div>
-                <div class="md:col-span-3">
-                    <label class="text-[11px] font-bold text-gray-500">ราคาต่อหน่วย (บาท)</label>
-                    <input class="input-flat w-full bg-gray-50 f-spec-price" placeholder="บาท" value="${data.price || ''}">
-                </div>
-            </div>
+            </div>`;
 
-            <div class="mt-3 flex items-center justify-end gap-3">
-                <div class="text-[11px] font-bold text-gray-500">รวมทั้งสิ้น (อัตโนมัติ)</div>
-                <input class="input-flat w-56 bg-white f-spec-total" placeholder="บาท" value="${data.total || ''}" readonly>
-            </div>
-
-            <div class="mt-5 space-y-2">
-                <div class="flex justify-between items-center">
-                    <div class="font-bold text-sm text-gray-700">คุณลักษณะ</div>
-                    <span class="text-[10px] font-bold text-gray-400"><span class="f-spec-cnt">0</span>/3000</span>
-                </div>
-                <textarea maxlength="3000" rows="4" class="input-flat w-full f-spec-desc" placeholder="พิมพ์...">${data.desc || ''}</textarea>
-            </div>
-
-            <div class="mt-6 space-y-3">
-                <div class="font-bold text-sm text-gray-700">เป็นครุภัณฑ์ตามมาตรฐานครุภัณฑ์ดังนี้ (บังคับเลือกได้แค่ 1)</div>
-                <div class="space-y-2">
-                    <label class="flex items-start gap-3"><input type="radio" name="f-spec-std-${idx}" class="mt-1 accent-indigo-600 f-spec-std" value="std_price"><span class="text-sm">ตัวเลือกที่ 1 บัญชีราคามาตรฐานครุภัณฑ์ สำนักงบประมาณ เดือน <input class="input-flat bg-gray-50 inline-block w-28 mx-1 f-std1-month" placeholder="เดือน"> พ.ศ. <input class="input-flat bg-gray-50 inline-block w-24 mx-1 f-std1-year" placeholder="พ.ศ."> หน้าที่ <input class="input-flat bg-gray-50 inline-block w-24 mx-1 f-std1-page" placeholder="หน้า"></span></label>
-                    <label class="flex items-start gap-3"><input type="radio" name="f-spec-std-${idx}" class="mt-1 accent-indigo-600 f-spec-std" value="comp_base"><span class="text-sm">ตัวเลือกที่ 2 เกณฑ์ราคากลางและคุณลักษณะพื้นฐานครุภัณฑ์คอมพิวเตอร์ กระทรวงดิจิทัลฯ ประกาศ ณ วันที่ <input class="input-flat bg-gray-50 inline-block w-40 mx-1 f-std2-date" placeholder="วันที่"> หน้าที่ <input class="input-flat bg-gray-50 inline-block w-24 mx-1 f-std2-page" placeholder="หน้า"></span></label>
-                    <label class="flex items-start gap-3"><input type="radio" name="f-spec-std-${idx}" class="mt-1 accent-indigo-600 f-spec-std" value="cctv_base"><span class="text-sm">ตัวเลือกที่ 3 เกณฑ์ราคากลางและคุณลักษณะพื้นฐานของระบบกล้องวงจรปิด กระทรวงดิจิทัลฯ ประกาศ ณ วันที่ <input class="input-flat bg-gray-50 inline-block w-40 mx-1 f-std3-date" placeholder="วันที่"> หน้าที่ <input class="input-flat bg-gray-50 inline-block w-24 mx-1 f-std3-page" placeholder="หน้า"></span></label>
-                    <label class="flex items-start gap-3"><input type="radio" name="f-spec-std-${idx}" class="mt-1 accent-indigo-600 f-spec-std" value="other_std"><span class="text-sm">ตัวเลือกที่ 4 มาตรฐานครุภัณฑ์อื่นๆ โปรดระบุ <input class="input-flat bg-gray-50 inline-block w-72 mx-1 f-std4-text" placeholder="ระบุ..."></span></label>
-                    <label class="flex items-start gap-3"><input type="radio" name="f-spec-std-${idx}" class="mt-1 accent-indigo-600 f-spec-std" value="off_list"><span class="text-sm">ตัวเลือกที่ 5 นอกบัญชีครุภัณฑ์</span></label>
-                </div>
-            </div>
-        `;
-
-        box.appendChild(wrap);
-
-        // set unit
-        const unitSel = wrap.querySelector('.f-spec-unit');
-        if (unitSel && data.unit) unitSel.value = data.unit;
-
-        // bind events
-        const qty = wrap.querySelector('.f-spec-qty');
-        const price = wrap.querySelector('.f-spec-price');
-        const desc = wrap.querySelector('.f-spec-desc');
-        const cnt = wrap.querySelector('.f-spec-cnt');
-        const syncCnt = () => { if (cnt && desc) cnt.innerText = String((desc.value || '').length); };
-        if (desc) { desc.oninput = syncCnt; syncCnt(); }
-        const recalc = () => this.form4RecalcSpecGroup(wrap);
-        if (qty) qty.oninput = recalc;
-        if (price) price.oninput = recalc;
-        recalc();
-
-        const rm = wrap.querySelector('[data-act="remove"]');
-        if (rm) rm.onclick = () => {
-            // กันไม่ให้ลบจนเหลือ 0
-            if ((document.getElementById('f-spec-groups')?.children?.length || 0) <= 1) return alert('ต้องมีอย่างน้อย 1 กรุ๊ป');
-            wrap.remove();
-        };
-
-        // เลือกค่ามาตรฐานเดิม (ถ้ามี)
-        if (data.stdChoice) {
-            const r = wrap.querySelector(`input.f-spec-std[value="${data.stdChoice}"]`);
-            if (r) r.checked = true;
+            modalRoot.classList.remove('hidden');
+            // set selected values
+            const roleSel = document.getElementById('um-role');
+            if (roleSel) roleSel.value = d.role || 'staff_dept';
+            const deptSel2 = document.getElementById('um-dept');
+            if (deptSel2) deptSel2.value = d.dept || '';
+            lucide.createIcons();
+        } catch (e) {
+            console.error('openUserEditModal error', e);
+            alert('เปิดฟอร์มแก้ไขไม่สำเร็จ');
         }
-
-        lucide.createIcons();
     },
 
-    form4RecalcSpecGroup(wrap) {
-        const qty = (wrap.querySelector('.f-spec-qty')?.value || '').toString().replace(/,/g,'');
-        const price = (wrap.querySelector('.f-spec-price')?.value || '').toString().replace(/,/g,'');
-        const q = parseFloat(qty);
-        const p = parseFloat(price);
-        const totalEl = wrap.querySelector('.f-spec-total');
-        if (!totalEl) return;
-        if (isFinite(q) && isFinite(p)) totalEl.value = String(Math.round(q * p * 100) / 100);
-        else totalEl.value = '';
+    closeUserEditModal() {
+        const modalRoot = document.getElementById('user-edit-modal');
+        if (!modalRoot) return;
+        modalRoot.classList.add('hidden');
+        modalRoot.innerHTML = '';
     },
 
-    // ---------- Fill masters ----------
-    async form4FillDepts() {
-        const sel = document.getElementById('f-dept');
-        if (!sel) return;
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('depts').orderBy('name').get();
-        sel.innerHTML = '<option value="">เลือกหน่วยงาน</option>' + snap.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('');
-    },
-
-    async form4FillBranches(deptId) {
-        const sel = document.getElementById('f-branch');
-        if (!sel) return;
-        if (!deptId) { sel.innerHTML = '<option value="">เลือกสาขา/งาน</option>'; return; }
-
-        // โครงสร้างสาขา/งาน: เก็บใน collection 'branches' และมี field deptId
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('branches')
-            .where('deptId', '==', deptId).orderBy('name').get().catch(() => null);
-
-        if (!snap) { sel.innerHTML = '<option value="">(ยังไม่มีข้อมูลสาขา/งาน)</option>'; return; }
-
-        sel.innerHTML = '<option value="">เลือกสาขา/งาน</option>' + snap.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('');
-    },
-
-    async form4FillBudgetSources() {
-        const sel = document.getElementById('f-budget-source');
-        if (!sel) return;
-        // ใช้ master เดิม 'budget_types' เป็นแหล่งเงิน (ไม่กระทบหน้าอื่น)
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('budget_types').orderBy('name').get();
-        sel.innerHTML = '<option value="">เลือกแหล่งเงินงบประมาณ</option>' + snap.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('');
-    },
-
-    async form4FillCategories() {
-        const sel = document.getElementById('f-category');
-        if (!sel) return;
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('categories').orderBy('name').get();
-        sel.innerHTML = '<option value="">เลือกประเภทครุภัณฑ์</option>' + snap.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('');
-    },
-
-    async form4FillUnits() {
-        const unitSel = document.getElementById('f-kpi-unit');
-        if (!unitSel) return;
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('units').orderBy('name').get();
-        const opts = '<option value="">เลือกหน่วยนับ</option>' + snap.docs.map(d => `<option value="${d.data().name}">${d.data().name}</option>`).join('');
-        unitSel.innerHTML = opts;
-
-        ['f-min-std-unit','f-have-total-unit','f-have-ok-unit','f-have-broken-unit'].forEach(id => {
-            const s = document.getElementById(id);
-            if (s) s.innerHTML = opts;
-        });
-    },
-
-    async form4FillStratIssue() {
-        const sel = document.getElementById('f-strat-issue');
-        if (!sel) return;
-
-        // โครงสร้าง: strat_issues (ตั้งต้นในหน้า admin)
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('strat_issues').orderBy('name').get().catch(() => null);
-        sel.innerHTML = '<option value="">เลือกประเด็นยุทธศาสตร์</option>' + (snap ? snap.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('') : '');
-    },
-
-    async form4FillBscDims() {
-        const sel = document.getElementById('f-bsc-dim');
-        if (!sel) return;
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('bsc_dims').orderBy('name').get().catch(() => null);
-        sel.innerHTML = '<option value="">เลือกมิติ</option>' + (snap ? snap.docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('') : '');
-    },
-
-    async form4FillStratKpis() {
-        const sel = document.getElementById('f-strat-kpi');
-        if (!sel) return;
-
-        const role = currentUser?.role || 'staff_dept';
-
-        // โครงสร้าง: strat_kpis
-        const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('strat_kpis').orderBy('name').get().catch(() => null);
-
-        // เงื่อนไขตามสั่ง: dropdown ข้อ 10 ให้ "admin และ staff_dept" เห็นค่าตั้งต้นของ "admin และ staff_central"
-        let docs = snap ? snap.docs : [];
-        if (role === 'admin' || role === 'staff_dept') {
-            // กรองเฉพาะที่สร้างโดย admin / staff_central (ถ้ามี field createdRole)
-            const filtered = docs.filter(d => {
-                const r = d.data().createdRole;
-                return !r || r === 'admin' || r === 'staff_central';
-            });
-            if (filtered.length) docs = filtered;
-        } else {
-            // role อื่น: ซ่อนรายการ (แต่ไม่ซ่อน UI)
-            docs = [];
-        }
-
-        sel.innerHTML = '<option value="">เลือกตัวชี้วัด (ข้อ 10)</option>' + docs.map(d => `<option value="${d.id}">${d.data().name}</option>`).join('');
-
-        // เลือกแล้วเติมลงตาราง KPI อัตโนมัติ
-        sel.onchange = () => {
-            const id = sel.value;
-            const found = docs.find(x => x.id === id);
-            if (!found) return;
-            const nameInput = document.getElementById('f-kpi-name');
-            if (nameInput) nameInput.value = found.data().name || '';
+    async saveUserEditModal() {
+        const id = document.getElementById('um-id')?.value?.trim();
+        if (!id) return alert('ไม่พบรหัสผู้ใช้งาน');
+        const userData = {
+            username: document.getElementById('um-user')?.value?.trim() || '',
+            password: document.getElementById('um-pass')?.value?.trim() || '',
+            fullname: document.getElementById('um-fullname')?.value?.trim() || '',
+            role: document.getElementById('um-role')?.value || 'staff_dept',
+            position: document.getElementById('um-pos')?.value?.trim() || '',
+            dept: document.getElementById('um-dept')?.value || ''
         };
-    },
-
-    async form4FillIntegrationDropdowns() {
-        // สาขา/งาน (reuse branches)
-        const deptId = document.getElementById('f-dept')?.value || '';
-        await this.form4FillBranches(deptId);
-
-        const intBranch = document.getElementById('f-int-branch');
-        const intDept = document.getElementById('f-int-dept');
-        if (intBranch) intBranch.innerHTML = document.getElementById('f-branch')?.innerHTML || '<option value="">เลือกสาขา/งาน</option>';
-        if (intDept) intDept.innerHTML = document.getElementById('f-dept')?.innerHTML || '<option value="">เลือกหน่วยงาน</option>';
-    },
-
-    // ---------- Repair table ----------
-    form4EnsureRepairRows(n = 2) {
-        const body = document.getElementById('f-repair-body');
-        if (!body) return;
-        if (body.children.length >= n) return;
-        while (body.children.length < n) this.form4AddRepairRow();
-    },
-
-    form4AddRepairRow(data = {}) {
-        const body = document.getElementById('f-repair-body');
-        if (!body) return;
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="px-4 py-3"><input class="input-flat w-full bg-white f-repair-no" placeholder="เลขที่ครุภัณฑ์" value="${data.no || ''}"></td>
-            <td class="px-4 py-3"><input class="input-flat w-full bg-white f-repair-name" placeholder="ชื่อครุภัณฑ์" value="${data.name || ''}"></td>
-            <td class="px-4 py-3"><input class="input-flat w-full bg-white f-repair-age" placeholder="อายุการใช้งาน" value="${data.age || ''}"></td>
-            <td class="px-4 py-3"><input class="input-flat w-full bg-white f-repair-exp" placeholder="ปีที่หมดอายุ" value="${data.expYear || ''}"></td>
-            <td class="px-4 py-3"><input class="input-flat w-full bg-white f-repair-his" placeholder="ประวัติการซ่อม" value="${data.history || ''}"></td>
-        `;
-        body.appendChild(row);
-    },
-
-    // ---------- Save / Reset ----------
-    resetForm4() {
-        // ล้างเฉพาะฟอร์ม (ง.4)
-        const ids = [
-            'f4-edit-id','f-budget-other','f-item-name','f-building-name','f-building-year','f-category-other',
-            'f-obj','f-strategy','f-need','f-objective2','f-kpi-name','f-kpi-target',
-            'f-min-std','f-have-total','f-have-ok','f-have-broken',
-            'f-int-branch-count','f-int-dept-count','f-int-knowledge',
-            'f-freq-teach-val','f-freq-seminar-val','f-freq-test-val',
-            'f-user-teach-val','f-user-seminar-val',
-            'f-install-place','f-install-budget','f-install-time',
-
-            // 19-22
-            'f-quote-name','f-quote-company','f-note-other-text',
-            'f-benefit-ult','f-benefit-ult-unit','f-benefit-ult-2567','f-benefit-ult-2568','f-benefit-ult-2569','f-benefit-ult-2570',
-            'f-benefit-out','f-benefit-out-unit','f-benefit-out-2567','f-benefit-out-2568','f-benefit-out-2569','f-benefit-out-2570',
-            'f-benefit-prod','f-benefit-prod-unit','f-benefit-prod-2567','f-benefit-prod-2568','f-benefit-prod-2569','f-benefit-prod-2570',
-            // 23
-            'f-coord-name','f-coord-position','f-coord-phone-office','f-coord-phone-mobile','f-coord-email',
-            // 24
-            'a1-q1','a1-old-years','a1-q3',
-            'a1-q2-2.2','a1-q2-2.3','a1-q2-2.4','a1-q4-4.1','a1-q4-4.2','a1-q5-5.1','a1-q5-5.2','a1-q5-5.3','a1-q5-5.5',
-            'a2-q1-1.1','a2-q1-1.2','a2-q2-2.1','a2-q2-2.2','a2-q3-3.1','a2-q3-3.2','a2-q3-3.3','a2-q3-3.4','a2-q4','a2-q5','a2-q6-note',
-            'a3-q1','a3-q2','a3-q3-note','a3-q4-note','a3-q5','a3-q6','a3-q7-note',
-            'a4-q1','a4-q2-2.1','a4-q2-2.2','a4-q3-note','a4-q4-note','a4-q5','a4-q6','a4-q7-note'
-        ];
-
-        // 20 แผนการใช้จ่าย (ต.ค.-ก.ย.)
-        const months = ['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'];
-        months.forEach(m => { ids.push(`f-spend-sign-${m}`, `f-spend-disb-${m}`); });
-        ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-
-        ['f-dept','f-branch','f-budget-source','f-category','f-strat-issue','f-bsc-dim','f-strat-kpi','f-kpi-unit',
-         'f-min-std-unit','f-have-total-unit','f-have-ok-unit','f-have-broken-unit','f-int-branch','f-int-dept'
-        ].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
-
-        ['f-freq-teach','f-freq-seminar','f-freq-test','f-user-teach','f-user-seminar','f-install-ready','f-install-need-work'].forEach(id => {
-            const el = document.getElementById(id); if (el) el.checked = false;
-        });
-
-        // clear files + previews
-        ['f-repair-pdf','f-install-img1','f-install-img2','f-equip-img1','f-equip-img2','f-equip-img3','f-equip-img4','f-quote-pdf'].forEach(id => {
-            const el = document.getElementById(id); if (el) el.value = '';
-        });
-        ['prev-install-1','prev-install-2','prev-equip-1','prev-equip-2','prev-equip-3','prev-equip-4'].forEach(id => {
-            const img = document.getElementById(id); if (img) { img.src=''; img.classList.add('hidden'); }
-        });
-
-        // reset repair table
-        const body = document.getElementById('f-repair-body');
-        if (body) body.innerHTML = '';
-        this.form4EnsureRepairRows(2);
-
-        // reset spec groups
-        const specBox = document.getElementById('f-spec-groups');
-        if (specBox) specBox.innerHTML = '';
-        this.form4EnsureSpecGroups(1);
-
-        // reset spend plan
-        ['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].forEach(m => {
-            const a = document.getElementById(`f-spend-sign-${m}`);
-            const b = document.getElementById(`f-spend-disb-${m}`);
-            if (a) a.value = '';
-            if (b) b.value = '';
-        });
-
-        // reset 22 radios
-        const r1 = document.getElementById('f-note-quote');
-        const r2 = document.getElementById('f-note-other');
-        if (r1) r1.checked = false;
-        if (r2) r2.checked = false;
-
-        // reset 24 radios
-        document.querySelectorAll('input[name=\"analysis-case\"],input[name=\"a1-q2\"],input[name=\"a1-q4\"],input[name=\"a1-q5\"],input[name=\"a2-q1\"],input[name=\"a2-q2\"],input[name=\"a2-q3\"],input[name=\"a2-q6\"],input[name=\"a3-q3\"],input[name=\"a3-q4\"],input[name=\"a3-q7\"],input[name=\"a4-q2\"],input[name=\"a4-q3\"],input[name=\"a4-q4\"],input[name=\"a4-q7\"]')
-            .forEach(el => { el.checked = false; });
-
-        this.initForm4();
-    },
-
-    async saveForm4() {
-        const deptId = document.getElementById('f-dept')?.value || '';
-        const branchId = document.getElementById('f-branch')?.value || '';
-        const budgetSourceId = document.getElementById('f-budget-source')?.value || '';
-        const itemName = document.getElementById('f-item-name')?.value?.trim() || '';
-        const categoryId = document.getElementById('f-category')?.value || '';
-        const stratIssueId = document.getElementById('f-strat-issue')?.value || '';
-        const bscDimId = document.getElementById('f-bsc-dim')?.value || '';
-
-        // required แบบเบาๆ เฉพาะส่วนที่สร้างไว้แล้ว
-        if (!deptId || !branchId || !budgetSourceId || !itemName || !categoryId || !stratIssueId || !bscDimId) {
-            return alert('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบ');
-        }
-        const analysisCase = document.querySelector('input[name="analysis-case"]:checked')?.value || '';
-        if (!analysisCase) return alert('กรุณาเลือกกรณีการวิเคราะห์ครุภัณฑ์ (ข้อ 24)');
-
-
-        // เก็บ rows ซ่อมบำรุง
-        const repairRows = [...document.querySelectorAll('#f-repair-body tr')].map(tr => ({
-            no: tr.querySelector('.f-repair-no')?.value || '',
-            name: tr.querySelector('.f-repair-name')?.value || '',
-            age: tr.querySelector('.f-repair-age')?.value || '',
-            expYear: tr.querySelector('.f-repair-exp')?.value || '',
-            history: tr.querySelector('.f-repair-his')?.value || ''
-        })).filter(r => Object.values(r).some(v => (v || '').toString().trim() !== ''));
-
-        // validate images size and required counts
-        const imgIds = ['f-install-img1','f-install-img2','f-equip-img1','f-equip-img2','f-equip-img3','f-equip-img4'];
-        const files = Object.fromEntries(imgIds.map(id => [id, document.getElementById(id)?.files?.[0] || null]));
-        const missingRequired = ['f-install-img1','f-install-img2','f-equip-img1','f-equip-img2','f-equip-img3','f-equip-img4'].some(id => !files[id]);
-        if (missingRequired) return alert('ข้อ 18 ต้องแนบรูปให้ครบ: สถานที่ติดตั้ง 2 รูป และครุภัณฑ์ 4 รูป');
-
-        const maxImg = 2 * 1024 * 1024;
-        for (const [id, f] of Object.entries(files)) {
-            if (f && f.size > maxImg) return alert('ไฟล์รูปต้องไม่เกิน 2MB/ภาพ');
-        }
-
-        const pdfFile = document.getElementById('f-repair-pdf')?.files?.[0] || null;
-        if (pdfFile && pdfFile.size > 10 * 1024 * 1024) return alert('ไฟล์ PDF ต้องไม่เกิน 10MB');
-
-        // PDF ใบเสนอราคา 20MB
-        const quotePdf = document.getElementById('f-quote-pdf')?.files?.[0] || null;
-        if (quotePdf && quotePdf.size > 20 * 1024 * 1024) return alert('ไฟล์ PDF (ใบเสนอราคา) ต้องไม่เกิน 20MB');
-
-        // Spec groups (19)
-        const specGroups = [...document.querySelectorAll('#f-spec-groups > div')].map(div => {
-            const idx = div.dataset.idx || '';
-            const stdChoice = div.querySelector(`input[name="f-spec-std-${idx}"]:checked`)?.value || '';
-            return {
-                name: div.querySelector('.f-spec-name')?.value || '',
-                qty: div.querySelector('.f-spec-qty')?.value || '',
-                unit: div.querySelector('.f-spec-unit')?.value || '',
-                price: div.querySelector('.f-spec-price')?.value || '',
-                total: div.querySelector('.f-spec-total')?.value || '',
-                desc: div.querySelector('.f-spec-desc')?.value || '',
-                stdChoice,
-                std1: { month: div.querySelector('.f-std1-month')?.value || '', year: div.querySelector('.f-std1-year')?.value || '', page: div.querySelector('.f-std1-page')?.value || '' },
-                std2: { date: div.querySelector('.f-std2-date')?.value || '', page: div.querySelector('.f-std2-page')?.value || '' },
-                std3: { date: div.querySelector('.f-std3-date')?.value || '', page: div.querySelector('.f-std3-page')?.value || '' },
-                std4: { text: div.querySelector('.f-std4-text')?.value || '' }
-            };
-        }).filter(g => {
-            const basics = [g.name, g.qty, g.unit, g.price, g.total, g.desc, g.stdChoice, g.std1?.month, g.std1?.year, g.std1?.page, g.std2?.date, g.std2?.page, g.std3?.date, g.std3?.page, g.std4?.text];
-            return basics.some(v => (v || '').toString().trim() !== '');
-        });
-
-        // Spend plan (20)
-        const months = ['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'];
-        const spendPlan = {
-            sign: Object.fromEntries(months.map(m => [m, document.getElementById(`f-spend-sign-${m}`)?.value || '' ])),
-            disburse: Object.fromEntries(months.map(m => [m, document.getElementById(`f-spend-disb-${m}`)?.value || '' ]))
-        };
-
-        // Benefits (21)
-        const benefits = {
-            ultimate: {
-                text: document.getElementById('f-benefit-ult')?.value || '',
-                unit: document.getElementById('f-benefit-ult-unit')?.value || '',
-                y2567: document.getElementById('f-benefit-ult-2567')?.value || '',
-                y2568: document.getElementById('f-benefit-ult-2568')?.value || '',
-                y2569: document.getElementById('f-benefit-ult-2569')?.value || '',
-                y2570: document.getElementById('f-benefit-ult-2570')?.value || ''
-            },
-            outcome: {
-                text: document.getElementById('f-benefit-out')?.value || '',
-                unit: document.getElementById('f-benefit-out-unit')?.value || '',
-                y2567: document.getElementById('f-benefit-out-2567')?.value || '',
-                y2568: document.getElementById('f-benefit-out-2568')?.value || '',
-                y2569: document.getElementById('f-benefit-out-2569')?.value || '',
-                y2570: document.getElementById('f-benefit-out-2570')?.value || ''
-            },
-            output: {
-                text: document.getElementById('f-benefit-prod')?.value || '',
-                unit: document.getElementById('f-benefit-prod-unit')?.value || '',
-                y2567: document.getElementById('f-benefit-prod-2567')?.value || '',
-                y2568: document.getElementById('f-benefit-prod-2568')?.value || '',
-                y2569: document.getElementById('f-benefit-prod-2569')?.value || '',
-                y2570: document.getElementById('f-benefit-prod-2570')?.value || ''
-            }
-        };
-
-        // Notes (22)
-        const noteType = document.querySelector('input[name="f-note-type"]:checked')?.value || '';
-        const notes = {
-            type: noteType,
-            quote: { name: document.getElementById('f-quote-name')?.value || '', company: document.getElementById('f-quote-company')?.value || '' },
-            other: { text: document.getElementById('f-note-other-text')?.value || '' }
-        };
-
-
-// Coordinator (23)
-const coordinator = {
-    name: document.getElementById('f-coord-name')?.value || '',
-    position: document.getElementById('f-coord-position')?.value || '',
-    phoneOffice: document.getElementById('f-coord-phone-office')?.value || '',
-    phoneMobile: document.getElementById('f-coord-phone-mobile')?.value || '',
-    email: document.getElementById('f-coord-email')?.value || ''
-};
-
-// Analysis (24)
-const analysis = { case: analysisCase, data: {} };
-
-if (analysisCase === '1') {
-    analysis.data = {
-        q1: document.getElementById('a1-q1')?.value || '',
-        oldYears: document.getElementById('a1-old-years')?.value || '',
-        q2Choice: document.querySelector('input[name="a1-q2"]:checked')?.value || '',
-        q2_22: document.getElementById('a1-q2-2.2')?.value || '',
-        q2_23: document.getElementById('a1-q2-2.3')?.value || '',
-        q2_24: document.getElementById('a1-q2-2.4')?.value || '',
-        q3: document.getElementById('a1-q3')?.value || '',
-        q4Choice: document.querySelector('input[name="a1-q4"]:checked')?.value || '',
-        q4_41: document.getElementById('a1-q4-4.1')?.value || '',
-        q4_42: document.getElementById('a1-q4-4.2')?.value || '',
-        q5Choice: document.querySelector('input[name="a1-q5"]:checked')?.value || '',
-        q5_51: document.getElementById('a1-q5-5.1')?.value || '',
-        q5_52: document.getElementById('a1-q5-5.2')?.value || '',
-        q5_53: document.getElementById('a1-q5-5.3')?.value || '',
-        q5_55: document.getElementById('a1-q5-5.5')?.value || ''
-    };
-}
-if (analysisCase === '2') {
-    analysis.data = {
-        q1Choice: document.querySelector('input[name="a2-q1"]:checked')?.value || '',
-        q1_11: document.getElementById('a2-q1-1.1')?.value || '',
-        q1_12: document.getElementById('a2-q1-1.2')?.value || '',
-        q2Choice: document.querySelector('input[name="a2-q2"]:checked')?.value || '',
-        q2_21: document.getElementById('a2-q2-2.1')?.value || '',
-        q2_22: document.getElementById('a2-q2-2.2')?.value || '',
-        q3Choice: document.querySelector('input[name="a2-q3"]:checked')?.value || '',
-        q3_31: document.getElementById('a2-q3-3.1')?.value || '',
-        q3_32: document.getElementById('a2-q3-3.2')?.value || '',
-        q3_33: document.getElementById('a2-q3-3.3')?.value || '',
-        q3_34: document.getElementById('a2-q3-3.4')?.value || '',
-        q4: document.getElementById('a2-q4')?.value || '',
-        q5: document.getElementById('a2-q5')?.value || '',
-        q6Choice: document.querySelector('input[name="a2-q6"]:checked')?.value || '',
-        q6Note: document.getElementById('a2-q6-note')?.value || ''
-    };
-}
-if (analysisCase === '3') {
-    analysis.data = {
-        q1: document.getElementById('a3-q1')?.value || '',
-        q2: document.getElementById('a3-q2')?.value || '',
-        q3Choice: document.querySelector('input[name="a3-q3"]:checked')?.value || '',
-        q3Note: document.getElementById('a3-q3-note')?.value || '',
-        q4Choice: document.querySelector('input[name="a3-q4"]:checked')?.value || '',
-        q4Note: document.getElementById('a3-q4-note')?.value || '',
-        q5: document.getElementById('a3-q5')?.value || '',
-        q6: document.getElementById('a3-q6')?.value || '',
-        q7Choice: document.querySelector('input[name="a3-q7"]:checked')?.value || '',
-        q7Note: document.getElementById('a3-q7-note')?.value || ''
-    };
-}
-if (analysisCase === '4') {
-    analysis.data = {
-        q1: document.getElementById('a4-q1')?.value || '',
-        q2Choice: document.querySelector('input[name="a4-q2"]:checked')?.value || '',
-        q2_21: document.getElementById('a4-q2-2.1')?.value || '',
-        q2_22: document.getElementById('a4-q2-2.2')?.value || '',
-        q3Choice: document.querySelector('input[name="a4-q3"]:checked')?.value || '',
-        q3Note: document.getElementById('a4-q3-note')?.value || '',
-        q4Choice: document.querySelector('input[name="a4-q4"]:checked')?.value || '',
-        q4Note: document.getElementById('a4-q4-note')?.value || '',
-        q5: document.getElementById('a4-q5')?.value || '',
-        q6: document.getElementById('a4-q6')?.value || '',
-        q7Choice: document.querySelector('input[name="a4-q7"]:checked')?.value || '',
-        q7Note: document.getElementById('a4-q7-note')?.value || ''
-    };
-}
-
-        // payload
-        const payload = {
-            deptId,
-            branchId,
-            budgetSourceId,
-            budgetOther: document.getElementById('f-budget-other')?.value || '',
-            itemName,
-            building: {
-                name: document.getElementById('f-building-name')?.value || '',
-                year: document.getElementById('f-building-year')?.value || ''
-            },
-            categoryId,
-            categoryOther: document.getElementById('f-category-other')?.value || '',
-            stratIssueId,
-            objectiveStrategic: document.getElementById('f-obj')?.value || '',
-            strategyAlign: document.getElementById('f-strategy')?.value || '',
-            bscDimId,
-            stratKpiId: document.getElementById('f-strat-kpi')?.value || '',
-            kpi: {
-                name: document.getElementById('f-kpi-name')?.value || '',
-                unit: document.getElementById('f-kpi-unit')?.value || '',
-                target: document.getElementById('f-kpi-target')?.value || ''
-            },
-            needReason: document.getElementById('f-need')?.value || '',
-            objective2: document.getElementById('f-objective2')?.value || '',
-            minStandard: {
-                std: document.getElementById('f-min-std')?.value || '',
-                stdUnit: document.getElementById('f-min-std-unit')?.value || '',
-                haveTotal: document.getElementById('f-have-total')?.value || '',
-                haveTotalUnit: document.getElementById('f-have-total-unit')?.value || '',
-                haveOk: document.getElementById('f-have-ok')?.value || '',
-                haveOkUnit: document.getElementById('f-have-ok-unit')?.value || '',
-                haveBroken: document.getElementById('f-have-broken')?.value || '',
-                haveBrokenUnit: document.getElementById('f-have-broken-unit')?.value || ''
-            },
-            repairHistory: repairRows,
-            integration: {
-                branchCount: document.getElementById('f-int-branch-count')?.value || '',
-                branchId: document.getElementById('f-int-branch')?.value || '',
-                deptCount: document.getElementById('f-int-dept-count')?.value || '',
-                deptId: document.getElementById('f-int-dept')?.value || '',
-                knowledge: document.getElementById('f-int-knowledge')?.value || ''
-            },
-            frequency: {
-                teach: { checked: !!document.getElementById('f-freq-teach')?.checked, value: document.getElementById('f-freq-teach-val')?.value || '' },
-                seminar: { checked: !!document.getElementById('f-freq-seminar')?.checked, value: document.getElementById('f-freq-seminar-val')?.value || '' },
-                test: { checked: !!document.getElementById('f-freq-test')?.checked, value: document.getElementById('f-freq-test-val')?.value || '' }
-            },
-            users: {
-                teach: { checked: !!document.getElementById('f-user-teach')?.checked, value: document.getElementById('f-user-teach-val')?.value || '' },
-                seminar: { checked: !!document.getElementById('f-user-seminar')?.checked, value: document.getElementById('f-user-seminar-val')?.value || '' }
-            },
-            install: {
-                place: document.getElementById('f-install-place')?.value || '',
-                ready: !!document.getElementById('f-install-ready')?.checked,
-                needWork: !!document.getElementById('f-install-need-work')?.checked,
-                budget: document.getElementById('f-install-budget')?.value || '',
-                time: document.getElementById('f-install-time')?.value || ''
-            },
-
-            // 19-22
-            specificationGroups: specGroups,
-            spendPlan,
-            benefits,
-            notes,
-            coordinator,
-            analysis,
-            createdBy: currentUser?.name || '',
-            createdRole: currentUser?.role || '',
-            createdDept: currentUser?.dept || '',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
+        if (!userData.username || !userData.password) return alert('กรอก Username และ Password ด้วยจ้า');
 
         this.showLoader();
-
-        // create / update doc
-        const editId = document.getElementById('f4-edit-id')?.value || '';
-        const colRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('form4_records');
-        const docRef = editId ? colRef.doc(editId) : colRef.doc();
-        await docRef.set(payload, { merge: true });
-
-        // upload files to Storage (ต้องมี firebase-storage)
-        const urls = {};
-        const basePath = `artifacts/${appId}/form4/${docRef.id}`;
-
-        // images
-        for (const [id, file] of Object.entries(files)) {
-            if (!file) continue;
-            const key = id.replace('f-','');
-            const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-            const ref = storage.ref().child(`${basePath}/${key}.${ext}`);
-            await ref.put(file);
-            urls[key] = await ref.getDownloadURL();
+        try {
+            const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users');
+            await col.doc(id).set({
+                ...userData,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            this.closeUserEditModal();
+            await this.loadUserTable();
+        } catch (e) {
+            console.error('saveUserEditModal error', e);
+            alert('บันทึกการแก้ไขไม่สำเร็จ');
+        } finally {
+            this.hideLoader();
         }
-
-        // pdf
-        if (pdfFile) {
-            const refPdf = storage.ref().child(`${basePath}/repair.pdf`);
-            await refPdf.put(pdfFile);
-            urls.repairPdf = await refPdf.getDownloadURL();
-        }
-
-        // quote pdf (22.1)
-        if (quotePdf) {
-            const refPdf2 = storage.ref().child(`${basePath}/quote.pdf`);
-            await refPdf2.put(quotePdf);
-            urls.quotePdf = await refPdf2.getDownloadURL();
-        }
-
-        if (Object.keys(urls).length) await docRef.set({ fileUrls: urls, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-
-        document.getElementById('f4-edit-id').value = docRef.id;
-        alert('บันทึก (ง.4) เรียบร้อย');
-        this.hideLoader();
     },
 
-    // ---------- UI helpers for this form ----------
-    bindCounter(textareaId, counterId) {
-        const el = document.getElementById(textareaId);
-        const c = document.getElementById(counterId);
-        if (!el || !c) return;
-        const sync = () => c.innerText = (el.value || '').length;
-        el.oninput = sync;
-        sync();
-    },
+    // คงชื่อเดิมไว้เผื่อมีที่เรียกใช้อยู่
+    async editUser(id) { return this.openUserEditModal(id); },
 
-    bindImagePreview(inputId, imgId, maxMb = 2) {
-        const inp = document.getElementById(inputId);
-        const img = document.getElementById(imgId);
-        if (!inp || !img) return;
-        inp.onchange = () => {
-            const f = inp.files?.[0];
-            if (!f) { img.src = ''; img.classList.add('hidden'); return; }
-            const max = maxMb * 1024 * 1024;
-            if (f.size > max) { inp.value=''; img.src=''; img.classList.add('hidden'); return alert(`ไฟล์รูปต้องไม่เกิน ${maxMb}MB`); }
-            const url = URL.createObjectURL(f);
-            img.src = url;
-            img.classList.remove('hidden');
-        };
+    async deleteUser(id) {
+        try {
+            const ok = confirm('ยืนยันลบผู้ใช้งานนี้?');
+            if (!ok) return;
+            const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users');
+            await col.doc(id).delete();
+            await this.loadUserTable();
+            // ถ้าลบตัวที่กำลังแก้ไขอยู่ให้เคลียร์ฟอร์ม
+            if (document.getElementById('u-edit-id')?.value === id) this.resetUserForm();
+        } catch (e) {
+            console.error('deleteUser error', e);
+            alert('ลบไม่สำเร็จ');
+        }
     },
 
     // --- Helpers ---
@@ -1325,7 +1516,21 @@ if (analysisCase === '4') {
         const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('depts').get();
         sel.innerHTML = '<option value="">เลือกหน่วยงาน</option>' + snap.docs.map(doc => `<option value="${doc.data().name}">${doc.data().name}</option>`).join('');
     },
-    resetUserForm() { document.getElementById('u-user').value = ""; document.getElementById('u-pass').value = ""; document.getElementById('u-fullname').value = ""; },
+    resetUserForm() {
+        document.getElementById('u-edit-id').value = "";
+        document.getElementById('u-user').value = "";
+        document.getElementById('u-pass').value = "";
+        document.getElementById('u-fullname').value = "";
+        const role = document.getElementById('u-role');
+        if (role) role.value = 'admin';
+        const pos = document.getElementById('u-pos');
+        if (pos) pos.value = "";
+        const dept = document.getElementById('u-dept-select');
+        if (dept) dept.value = "";
+        const btn = document.getElementById('btn-save-user');
+        if (btn) btn.innerHTML = '<i data-lucide="check-circle" size="18"></i> บันทึก';
+        lucide.createIcons();
+    },
     showLoader() { document.getElementById('loader').classList.remove('hidden'); },
     hideLoader() { document.getElementById('loader').classList.add('hidden'); }
 };
