@@ -22,3 +22,18 @@ body { background-color: #ede9fe; }
     main { margin: 0; padding: 0; background: white; }
     .card-main { border-radius: 0; border: none; box-shadow: none; }
 }
+/* =========================
+   Responsive (ง.4) only
+   ปรับเฉพาะ Tab1 ฟอร์ม .form4-page
+   ========================= */
+@media (max-width: 768px) {
+  .form4-page { padding: 1rem !important; }
+  .form4-page .card-main { padding: 1rem !important; }
+  .form4-page h3 { font-size: 1.25rem; }
+  .form4-page h4 { font-size: 1.05rem; }
+  .form4-page h5 { font-size: 0.95rem; }
+  .form4-page table { font-size: 0.75rem; }
+  .form4-page table thead { display: none; }
+  .form4-page table tr { display: block; margin-bottom: 0.75rem; border: 1px solid #e5e7eb; border-radius: 1rem; padding: 0.75rem; }
+  .form4-page table td { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+}
