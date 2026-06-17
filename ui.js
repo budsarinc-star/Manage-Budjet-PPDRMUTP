@@ -59,7 +59,7 @@ const UI = {
                 <button onclick="App.switchSubTab('manage', 'tab2')" class="flex-1 py-4 px-6 rounded-2xl font-bold transition-all ${subTab === 'tab2' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-gray-500'}">(ง.5)</button>
                 <button onclick="App.switchSubTab('manage', 'tab3')" class="flex-1 py-4 px-6 rounded-2xl font-bold transition-all ${subTab === 'tab3' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-gray-500'}">(ง.6)</button>
             </div>
-            ${subTab === 'tab1' ? this.manageForm4Template() : `<div class="card-main p-20 text-center text-gray-300 italic">อยู่ระหว่างรอดำเนินการ</div>`}
+            ${subTab === 'tab1' ? this.manageForm4Template() : (subTab === 'tab3' ? this.manageForm6Template() : `<div class="card-main p-20 text-center text-gray-300 italic">อยู่ระหว่างรอดำเนินการ</div>`)}
         </div>
 <!-- Admin Edit Modal Root (เฉพาะหน้า ตั้งต้นข้อมูล) -->
 <div id="admin-edit-modal" class="hidden"></div>`;
@@ -188,25 +188,37 @@ const UI = {
                             </div>
                         </div>
 
-                        <!-- Step 4: กลยุทธ์ -->
-                        <div class="f4-strat-row bg-indigo-50/30 border-t border-indigo-50">
+                        <!-- Step 4: กลยุทธ์ (เลือกได้หลายอัน) -->
+                        <div class="f4-strat-row bg-indigo-50/30 border-t border-indigo-50 items-start">
                             <div class="f4-strat-badge bg-purple-500 text-white">4</div>
-                            <div class="f4-strat-label">กลยุทธ์</div>
+                            <div class="f4-strat-label pt-2.5">กลยุทธ์</div>
                             <div class="f4-strat-field">
-                                <select id="f-dimension" class="f4-strat-select" disabled onchange="App.f4CascadeStep('dimension')">
-                                    <option value="">— เลือกวัตถุประสงค์ก่อน —</option>
-                                </select>
+                                <div id="f-dimension-rows" class="space-y-2"></div>
+                                <div class="flex items-center gap-2 mt-2 no-print">
+                                    <button type="button" onclick="App.f4AddMultiRow('dimension')" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                                        <i data-lucide="plus" size="13"></i> เพิ่มแถว
+                                    </button>
+                                    <button type="button" onclick="App.f4RemoveMultiRow('dimension')" class="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                                        <i data-lucide="minus" size="13"></i> ลบแถว
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Step 5: กลยุทธ์ย่อย -->
-                        <div class="f4-strat-row bg-white border-t border-indigo-50">
+                        <!-- Step 5: กลยุทธ์ย่อย (เลือกได้หลายอัน) -->
+                        <div class="f4-strat-row bg-white border-t border-indigo-50 items-start">
                             <div class="f4-strat-badge bg-purple-400 text-white">5</div>
-                            <div class="f4-strat-label">กลยุทธ์ย่อย <span class="text-[10px] font-normal text-gray-400">(ถ้ามี)</span></div>
+                            <div class="f4-strat-label pt-2.5">กลยุทธ์ย่อย <span class="text-[10px] font-normal text-gray-400">(ถ้ามี)</span></div>
                             <div class="f4-strat-field">
-                                <select id="f-substrategy" class="f4-strat-select" disabled onchange="App.f4CascadeStep('substrategy')">
-                                    <option value="">— เลือกกลยุทธ์ก่อน —</option>
-                                </select>
+                                <div id="f-substrategy-rows" class="space-y-2"></div>
+                                <div class="flex items-center gap-2 mt-2 no-print">
+                                    <button type="button" onclick="App.f4AddMultiRow('substrategy')" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                                        <i data-lucide="plus" size="13"></i> เพิ่มแถว
+                                    </button>
+                                    <button type="button" onclick="App.f4RemoveMultiRow('substrategy')" class="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                                        <i data-lucide="minus" size="13"></i> ลบแถว
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -221,14 +233,20 @@ const UI = {
                             </div>
                         </div>
 
-                        <!-- Step 7: ตัวชี้วัด (สีเขียวเน้น) -->
-                        <div class="f4-strat-row bg-emerald-50/40 border-t border-emerald-100">
+                        <!-- Step 7: ตัวชี้วัด (สีเขียวเน้น เลือกได้หลายอัน) -->
+                        <div class="f4-strat-row bg-emerald-50/40 border-t border-emerald-100 items-start">
                             <div class="f4-strat-badge bg-emerald-600 text-white">7</div>
-                            <div class="f4-strat-label font-black text-emerald-800">ตัวชี้วัด (KPI)</div>
+                            <div class="f4-strat-label font-black text-emerald-800 pt-2.5">ตัวชี้วัด (KPI)</div>
                             <div class="f4-strat-field">
-                                <select id="f-kpi" class="f4-strat-select border-emerald-200 bg-emerald-50/60" disabled>
-                                    <option value="">— เลือกมิติก่อน —</option>
-                                </select>
+                                <div id="f-kpi-multi-rows" class="space-y-2"></div>
+                                <div class="flex items-center gap-2 mt-2 no-print">
+                                    <button type="button" onclick="App.f4AddMultiRow('kpi')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                                        <i data-lucide="plus" size="13"></i> เพิ่มแถว
+                                    </button>
+                                    <button type="button" onclick="App.f4RemoveMultiRow('kpi')" class="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                                        <i data-lucide="minus" size="13"></i> ลบแถว
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -1256,8 +1274,574 @@ adminMiniTableBlock(title, key, headers) {
 
     adminUserTemplate() {
         return `<div class="card-main relative overflow-hidden p-10"><div class="rainbow-line absolute top-0 left-0 w-full h-1"></div><h3 class="text-[#4c1d95] font-black text-2xl flex items-center gap-3 mb-10"><i data-lucide="users" size="28"></i> จัดการผู้ใช้งานระบบ</h3><div class="bg-[#f5f3ff] p-8 rounded-[2rem] border border-purple-100 shadow-sm mb-12"><div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 items-end"><input type="hidden" id="u-edit-id"><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Username</label><input id="u-user" placeholder="ระบุชื่อผู้ใช้" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Password</label><input id="u-pass" placeholder="ระบุรหัสผ่าน" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ชื่อ-นามสกุล</label><input id="u-fullname" placeholder="ระบุชื่อ-สกุล" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">สิทธิ์การใช้งาน</label><select id="u-role" class="input-flat w-full bg-white font-bold"><option value="admin">ผู้ดูแลระบบ</option><option value="manager">ผู้บริหาร</option><option value="staff_central">เจ้าหน้าที่ส่วนกลาง</option><option value="staff_dept">เจ้าหน้าที่หน่วยงาน</option></select></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ตำแหน่ง</label><input id="u-pos" placeholder="ระบุตำแหน่ง" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">หน่วยงาน</label><select id="u-dept-select" class="input-flat w-full bg-white font-bold"></select></div><div class="lg:col-span-2 flex gap-2 justify-end"><button id="btn-save-user" onclick="App.saveUser()" class="bg-[#10b981] hover:bg-green-600 text-white h-[42px] px-6 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all"><i data-lucide="check-circle" size="18"></i> บันทึก</button><button onclick="App.resetUserForm()" class="bg-gray-100 text-gray-400 h-[42px] w-[42px] rounded-xl flex items-center justify-center hover:bg-gray-200"><i data-lucide="refresh-ccw" size="18"></i></button></div></div></div><div class="overflow-hidden border border-purple-50 rounded-[2rem] bg-white shadow-xl"><table class="w-full text-left text-sm"><thead class="table-header"><tr class="bg-indigo-50/50"><th class="px-6 py-5">Username</th><th class="px-6 py-5">Password</th><th class="px-6 py-5">ชื่อ - นามสกุล</th><th class="px-6 py-5 text-center">สิทธิ์</th><th class="px-6 py-5">ตำแหน่ง</th><th class="px-6 py-5">หน่วยงาน</th><th class="px-6 py-5">วันที่บันทึก</th><th class="px-6 py-5 text-center">จัดการ</th></tr></thead><tbody id="user-list-body" class="divide-y divide-gray-50"></tbody></table></div><div id="user-edit-modal" class="hidden"></div></div>`;
-    }
-    
+    },
+
+    manageForm6Template() {
+    return `<div class="card-main p-12 bg-white relative print:p-0 print:shadow-none form4-page">
+        <!-- Print-only form code (top-right on paper) -->
+        <div class="print-only form4-print-code">แบบ ง.6</div>
+
+        <div class="flex flex-col md:flex-row justify-between items-start gap-4 mb-10 no-print">
+            <div>
+                <h3 class="text-indigo-900 font-black text-2xl">(ง.6) แบบเสนอขอโครงการ</h3>
+                <p class="text-[11px] text-gray-400 font-bold mt-1">ข้อมูล <span class="text-red-500">*</span> สีแดง คือบังคับกรอกข้อมูล</p>
+            </div>
+            <div class="flex gap-2 items-center">
+                <input type="hidden" id="f6-edit-id">
+                <div class="text-right pr-1 text-[11px] font-bold text-gray-500">แบบ ง.6<br><span class="text-[10px] text-gray-400">(ฉบับปรับปรุงใหม่ กันยายน 2568)</span></div>
+            </div>
+        </div>
+
+        <!-- หัวข้อกลาง -->
+        <div class="text-center mb-10 form4-header">
+            <img src="logo.png" class="w-20 mx-auto mb-4" alt="RMUTP Logo">
+            <h4 class="font-bold text-xl">มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร</h4>
+            <h5 class="font-bold text-lg text-slate-500">แบบเสนอขอโครงการ</h5>
+        </div>
+
+        <div class="space-y-6">
+
+            <!-- ══ SECTION A: ข้อมูลพื้นฐานโครงการ (ข้อ 1-3) ══ -->
+            <div class="space-y-0 rounded-[1.5rem] border border-gray-100 overflow-hidden shadow-sm">
+
+                <!-- แถว 1: หน่วยงาน | สาขา/งาน | ปีงบประมาณ -->
+                <div class="grid grid-cols-3 divide-x divide-gray-100 bg-white">
+                    <div class="f4-cell">
+                        <label class="f4-cell-label">หน่วยงาน <span class="text-red-500">*</span></label>
+                        <select id="f6-dept" class="f4-cell-input"></select>
+                    </div>
+                    <div class="f4-cell">
+                        <label class="f4-cell-label">สาขา / งาน</label>
+                        <select id="f6-branch" class="f4-cell-input"></select>
+                    </div>
+                    <div class="f4-cell">
+                        <label class="f4-cell-label">ปีงบประมาณ <span class="text-red-500">*</span></label>
+                        <select id="f6-year" class="f4-cell-input"></select>
+                    </div>
+                </div>
+
+                <!-- แถว 2: ชื่อโครงการ -->
+                <div class="grid grid-cols-1 divide-x divide-gray-100 bg-indigo-50/20 border-t border-gray-100">
+                    <div class="f4-cell">
+                        <label class="f4-cell-label">1. ชื่อโครงการ <span class="text-red-500">*</span></label>
+                        <input id="f6-project-name" class="f4-cell-input" placeholder="ระบุชื่อโครงการ">
+                    </div>
+                </div>
+
+                <!-- แถว 3: ลักษณะโครงการ -->
+                <div class="grid grid-cols-1 bg-white border-t border-gray-100">
+                    <div class="f4-cell">
+                        <label class="f4-cell-label">2. ลักษณะโครงการ <span class="text-red-500">*</span> <span class="text-[10px] font-normal text-gray-400">(เลือกได้มากกว่า 1)</span></label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
+                            ${['การอบรม (การบรรยาย/การฝึกปฏิบัติ)','การประชุม/การสัมมนาทางวิชาการหรือเชิงปฏิบัติการ','การดูงาน การฝึกศึกษา','การจัดงาน การจัดนิทรรศการ',
+                               'การวิเคราะห์ การทดสอบ การตรวจสอบ','การฝึกอบรมเพื่อถ่ายทอดความรู้เทคโนโลยี','การให้บริการข้อมูล การเผยแพร่ความรู้ผ่านสื่อต่าง ๆ','อื่น ๆ']
+                              .map((label, i) => `<label class="flex items-center gap-2 text-sm"><input type="checkbox" id="f6-nature-${i}" value="${label}" class="accent-indigo-600" ${i === 7 ? 'onchange="App.f6ToggleNatureOther()"' : ''}><span>${label}</span></label>`).join('')}
+                        </div>
+                        <input id="f6-nature-other-text" class="f4-cell-input mt-2 hidden" placeholder="โปรดระบุ (กรณีเลือกอื่นๆ)">
+                    </div>
+                </div>
+
+                <!-- แถว 4: แหล่งเงินงบประมาณ | อื่นๆ (เต็มแถว) -->
+                <div class="grid grid-cols-[1fr_1fr] divide-x divide-gray-100 bg-indigo-50/20 border-t border-gray-100">
+                    <div class="f4-cell">
+                        <label class="f4-cell-label">3. แหล่งเงินงบประมาณ <span class="text-red-500">*</span></label>
+                        <select id="f6-budget-source" class="f4-cell-input"></select>
+                    </div>
+                    <div class="f4-cell">
+                        <label class="f4-cell-label text-gray-400">อื่นๆ โปรดระบุ</label>
+                        <input id="f6-budget-other" placeholder="โปรดระบุ (กรณีเลือกอื่นๆ)" class="f4-cell-input">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION B: แผนงาน / ยุทธศาสตร์ชาติ / แผนแม่บท / แผน 13 (ข้อ 4-7) ══ -->
+            <div class="space-y-4">
+                <div class="text-xs font-bold text-red-500 flex items-center gap-2">
+                    <i data-lucide="target" size="13"></i> * ความเชื่อมโยงกับแผนระดับชาติและแผนงานของมหาวิทยาลัย
+                </div>
+
+                <!-- 4. แผนงาน -->
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-4">
+                    <div class="font-bold text-sm">4. แผนงาน</div>
+
+                    <div class="space-y-2 pl-2">
+                        <div class="text-xs font-bold text-gray-500">4.1 แผนงานพื้นฐานด้านการพัฒนาและเสริมสร้างศักยภาพทรัพยากรมนุษย์</div>
+                        <label class="flex items-center gap-2 text-sm pl-4"><input type="checkbox" id="f6-plan41-a" class="accent-indigo-600"><span>ผลผลิต ผลงานการให้บริการวิชาการ</span></label>
+                        <label class="flex items-center gap-2 text-sm pl-4"><input type="checkbox" id="f6-plan41-b" class="accent-indigo-600"><span>ผลผลิต ผลงานทำนุบำรุงศิลปวัฒนธรรม</span></label>
+                    </div>
+
+                    <div class="space-y-2 pl-2">
+                        <div class="text-xs font-bold text-gray-500">4.2 แผนงานยุทธศาสตร์พัฒนาศักยภาพคนตลอดช่วงชีวิต</div>
+                        <label class="flex items-center gap-2 text-sm pl-4"><input type="checkbox" id="f6-plan42-a" class="accent-indigo-600"><span>ผลผลิต ผู้สำเร็จการศึกษาด้านสังคมศาสตร์</span></label>
+                        <label class="flex items-center gap-2 text-sm pl-4"><input type="checkbox" id="f6-plan42-b" class="accent-indigo-600"><span>ผลผลิต ผู้สำเร็จการศึกษาด้านวิทยาศาสตร์และเทคโนโลยี</span></label>
+                        <label class="flex items-center gap-2 text-sm pl-4"><input type="checkbox" id="f6-plan42-c" class="accent-indigo-600"><span>ผลผลิต การพัฒนาศักยภาพกำลังคนสมรรถนะสูงเพื่อรองรับอุตสาหกรรมเป้าหมายของประเทศ</span></label>
+                        <div class="flex items-center gap-2 pl-4"><input type="checkbox" id="f6-plan42-proj" class="accent-indigo-600"><span class="text-sm">โครงการสำคัญ โปรดระบุ</span><input id="f6-plan42-proj-text" class="input-flat flex-1 py-1 px-2 text-xs" placeholder="ระบุ..."></div>
+                    </div>
+
+                    <div class="space-y-2 pl-2">
+                        <div class="flex items-center gap-2"><span class="text-xs font-bold text-gray-500">4.3 แผนงานยุทธศาสตร์ โปรดระบุ</span><input id="f6-plan43-text" class="input-flat flex-1 py-1 px-2 text-xs" placeholder="ระบุ..."></div>
+                        <div class="flex items-center gap-2 pl-4"><input type="checkbox" id="f6-plan43-proj" class="accent-indigo-600"><span class="text-sm">โครงการสำคัญ โปรดระบุ</span><input id="f6-plan43-proj-text" class="input-flat flex-1 py-1 px-2 text-xs" placeholder="ระบุ..."></div>
+                    </div>
+
+                    <div class="space-y-2 pl-2">
+                        <div class="text-xs font-bold text-gray-500">4.4 แผนงานบูรณาการ</div>
+                        <div class="flex items-center gap-2 pl-4"><input type="checkbox" id="f6-plan44" class="accent-indigo-600"><span class="text-sm">ผลผลิต โปรดระบุ</span><input id="f6-plan44-text" class="input-flat flex-1 py-1 px-2 text-xs" placeholder="ระบุ..."></div>
+                    </div>
+                </div>
+
+                <!-- 5. ยุทธศาสตร์ชาติ -->
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-2">
+                    <div class="font-bold text-sm">5. ยุทธศาสตร์ชาติ</div>
+                    <label class="flex items-start gap-3 text-sm pl-2"><input type="checkbox" id="f6-natstrat-2" class="accent-indigo-600 mt-0.5"><span>ข้อ 2 ด้านการสร้างความสามารถในการแข่งขัน (เลือกแผนแม่บทข้อ 8)</span></label>
+                    <label class="flex items-start gap-3 text-sm pl-2"><input type="checkbox" id="f6-natstrat-3" class="accent-indigo-600 mt-0.5"><span>ข้อ 3 ด้านการพัฒนาและเสริมสร้างศักยภาพมนุษย์ (เลือกแผนแม่บทข้อ 11, ข้อ 12 หรือข้อ 23)</span></label>
+                </div>
+
+                <!-- 6. แผนแม่บทภายใต้ยุทธศาสตร์ชาติ -->
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-2">
+                    <div class="font-bold text-sm">6. แผนแม่บทภายใต้ยุทธศาสตร์ชาติ</div>
+                    <label class="flex items-center gap-3 text-sm pl-2"><input type="checkbox" id="f6-masterplan-8" class="accent-indigo-600"><span>ข้อ 8 ผู้ประกอบการและวิสาหกิจขนาดกลางและขนาดย่อมยุคใหม่</span></label>
+                    <label class="flex items-center gap-3 text-sm pl-2"><input type="checkbox" id="f6-masterplan-11" class="accent-indigo-600"><span>ข้อ 11 ศักยภาพคนตลอดชีวิต</span></label>
+                    <label class="flex items-center gap-3 text-sm pl-2"><input type="checkbox" id="f6-masterplan-12" class="accent-indigo-600"><span>ข้อ 12 การพัฒนาการเรียนรู้</span></label>
+                    <label class="flex items-center gap-3 text-sm pl-2"><input type="checkbox" id="f6-masterplan-23" class="accent-indigo-600"><span>ข้อ 23 การวิจัยและพัฒนานวัตกรรม</span></label>
+                </div>
+
+                <!-- 7. แผนพัฒนาเศรษฐกิจและสังคมแห่งชาติ ฉบับที่ 13 -->
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-2">
+                    <div class="font-bold text-sm">7. แผนพัฒนาเศรษฐกิจและสังคมแห่งชาติ ฉบับที่ 13 (พ.ศ. 2566 – 2570)</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-1">
+                        ${[
+                            'หมุดหมายที่ 1 เกษตร และเกษตรแปรรูปมูลค่าสูง',
+                            'หมุดหมายที่ 2 การท่องเที่ยว เน้นคุณค่า',
+                            'หมุดหมายที่ 3 ฐานการผลิตยานยนต์ไฟฟ้า',
+                            'หมุดหมายที่ 4 การแพทย์ และสุขภาพครบวงจร',
+                            'หมุดหมายที่ 5 ประตูการค้า การลงทุนและโลจิสติกส์',
+                            'หมุดหมายที่ 6 อิเล็กทรอนิกส์ อัจฉริยะ และบริการดิจิทัล',
+                            'หมุดหมายที่ 7 SMEs วิสาหกิจ ชุมชนและวิสาหกิจเพื่อสังคมเติบโตอย่างต่อเนื่อง ยั่งยืน',
+                            'หมุดหมายที่ 8 พื้นที่และเมืองมีความเจริญ ทันสมัยและน่าอยู่',
+                            'หมุดหมายที่ 9 ความยากจนข้ามรุ่นลดลงและได้รับความคุ้มครองทางสังคมเพียงพอ เหมาะสม',
+                            'หมุดหมายที่ 10 เศรษฐกิจหมุนเวียนและสังคมคาร์บอนต่ำ',
+                            'หมุดหมายที่ 11 การลดความเสี่ยงจากภัยธรรมชาติและการเปลี่ยนแปลงสภาพภูมิอากาศ',
+                            'หมุดหมายที่ 12 กำลังคนมีสมรรถนะสูงตอบโจทย์การพัฒนาแห่งอนาคต',
+                            'หมุดหมายที่ 13 ภาครัฐที่มีสมรรถนะสูง'
+                        ].map((label, i) => `<label class="flex items-start gap-2 text-sm"><input type="checkbox" id="f6-milestone-${i+1}" class="accent-indigo-600 mt-0.5"><span>${label}</span></label>`).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION C: ความเชื่อมโยงประเด็นยุทธศาสตร์ / วัตถุประสงค์ / กลยุทธ์ (ข้อ 8-10) ══ -->
+            <div class="space-y-3" id="f6-strat-section">
+                <div class="text-xs font-bold text-red-500 flex items-center gap-2">
+                    <i data-lucide="target" size="13"></i>
+                    * ความสอดคล้องกับประเด็นยุทธศาสตร์ / วัตถุประสงค์เชิงยุทธศาสตร์ / กลยุทธ์ของมหาวิทยาลัย
+                </div>
+
+                <div class="rounded-[1.5rem] border border-indigo-100 overflow-hidden shadow-sm">
+                    <!-- 8. ประเด็นยุทธศาสตร์ -->
+                    <div class="f4-strat-row bg-white">
+                        <div class="f4-strat-badge bg-indigo-600 text-white">8</div>
+                        <div class="f4-strat-label">ประเด็นยุทธศาสตร์</div>
+                        <div class="f4-strat-field">
+                            <select id="f6-issue" class="f4-strat-select" onchange="App.f6CascadeStep('issue')">
+                                <option value="">— เลือกประเด็นยุทธศาสตร์ —</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 9. วัตถุประสงค์เชิงยุทธศาสตร์ -->
+                    <div class="f4-strat-row bg-indigo-50/30 border-t border-indigo-50">
+                        <div class="f4-strat-badge bg-indigo-400 text-white">9</div>
+                        <div class="f4-strat-label">วัตถุประสงค์เชิงยุทธศาสตร์</div>
+                        <div class="f4-strat-field">
+                            <select id="f6-strategy" class="f4-strat-select" disabled onchange="App.f6CascadeStep('strategy')">
+                                <option value="">— เลือกประเด็นก่อน —</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 10. กลยุทธ์ -->
+                    <div class="f4-strat-row bg-white border-t border-indigo-50">
+                        <div class="f4-strat-badge bg-purple-500 text-white">10</div>
+                        <div class="f4-strat-label">กลยุทธ์</div>
+                        <div class="f4-strat-field">
+                            <select id="f6-dimension" class="f4-strat-select" disabled onchange="App.f6CascadeStep('dimension')">
+                                <option value="">— เลือกวัตถุประสงค์ก่อน —</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION D: หลักการและเหตุผล / วัตถุประสงค์ / บูรณาการ (ข้อ 11-13) ══ -->
+            <div class="space-y-8">
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-red-500">* 11. หลักการและเหตุผล</label>
+                        <span class="text-[10px] font-bold text-gray-400"><span id="f6-cnt-rationale">0</span>/3000</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 font-bold">ระบุความสำคัญ ความจำเป็น เหตุผล Problem/Project/Area Based และแนวทางการพัฒนาสิ่งใหม่</p>
+                    <textarea id="f6-rationale" maxlength="3000" rows="6" class="input-flat w-full" placeholder="โปรดระบุ ..." oninput="document.getElementById('f6-cnt-rationale').innerText=this.value.length"></textarea>
+                </div>
+
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-red-500">* 12. วัตถุประสงค์</label>
+                        <span class="text-[10px] font-bold text-gray-400"><span id="f6-cnt-objective">0</span>/3000</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 font-bold">ต้องสอดคล้องกับชื่อโครงการ หลักการและเหตุผล มิติ BSC และตัวชี้วัด</p>
+                    <textarea id="f6-objective" maxlength="3000" rows="4" class="input-flat w-full" placeholder="โปรดระบุ ..." oninput="document.getElementById('f6-cnt-objective').innerText=this.value.length"></textarea>
+                </div>
+
+                <div class="card-main p-6 bg-indigo-50/20 border border-indigo-100 rounded-[1.5rem] space-y-3">
+                    <label class="text-xs font-bold text-gray-600">13. การบูรณาการองค์ความรู้ระหว่างสาขาวิชา</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-gray-400">บูรณาการกับคณะวิชา/หน่วยงาน</label>
+                            <input id="f6-integrate-faculty" class="input-flat w-full bg-white" placeholder="ระบุ...">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-bold text-gray-400">บูรณาการกับสาขาวิชา</label>
+                            <input id="f6-integrate-branch" class="input-flat w-full bg-white" placeholder="ระบุ...">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[11px] font-bold text-gray-400">องค์ความรู้ที่ต้องการบูรณาการข้ามศาสตร์ (ถ้ามี)</label>
+                        <input id="f6-integrate-knowledge" class="input-flat w-full bg-white" placeholder="ระบุ...">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION E: กลุ่มเป้าหมาย / ผู้เข้าร่วมโครงการ (ข้อ 14-15) ══ -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-3">
+                    <label class="text-xs font-bold text-gray-600">14. กลุ่มเป้าหมาย</label>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-3"><span class="text-sm flex-1">1. บุคลากร</span><input id="f6-target-staff" type="number" min="0" class="input-flat w-28 bg-gray-50" placeholder="0" oninput="App.f6RecalcTargets()"><span class="text-xs text-gray-400">คน</span></div>
+                        <div class="flex items-center gap-3"><span class="text-sm flex-1">2. นักศึกษา</span><input id="f6-target-student" type="number" min="0" class="input-flat w-28 bg-gray-50" placeholder="0" oninput="App.f6RecalcTargets()"><span class="text-xs text-gray-400">คน</span></div>
+                        <div class="flex items-center gap-3"><span class="text-sm flex-1">3. บุคคลภายนอก โปรดระบุ <input id="f6-target-external-text" class="input-flat w-24 inline-block py-1 px-2 text-xs ml-1"></span><input id="f6-target-external" type="number" min="0" class="input-flat w-28 bg-gray-50" placeholder="0" oninput="App.f6RecalcTargets()"><span class="text-xs text-gray-400">คน</span></div>
+                    </div>
+                    <div class="pt-2 border-t border-gray-100 flex justify-between items-center">
+                        <span class="text-sm font-bold">รวมจำนวนทั้งสิ้น</span>
+                        <span class="font-black text-indigo-700"><span id="f6-target-total">0</span> คน</span>
+                    </div>
+                </div>
+
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-3">
+                    <label class="text-xs font-bold text-gray-600">15. ผู้เข้าร่วมโครงการ</label>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-3"><span class="text-sm flex-1">1. วิทยากร/ผู้ติดตามวิทยากร</span><input id="f6-attend-speaker" type="number" min="0" class="input-flat w-28 bg-gray-50" placeholder="0" oninput="App.f6RecalcAttendees()"><span class="text-xs text-gray-400">คน</span></div>
+                        <div class="flex items-center gap-3"><span class="text-sm flex-1">2. คณะกรรมการดำเนินโครงการ/พนักงานขับรถยนต์</span><input id="f6-attend-committee" type="number" min="0" class="input-flat w-28 bg-gray-50" placeholder="0" oninput="App.f6RecalcAttendees()"><span class="text-xs text-gray-400">คน</span></div>
+                    </div>
+                    <div class="pt-2 border-t border-gray-100 flex justify-between items-center">
+                        <span class="text-sm font-bold">รวมจำนวนทั้งสิ้น</span>
+                        <span class="font-black text-indigo-700"><span id="f6-attend-total">0</span> คน</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION F: วันและสถานที่ดำเนินโครงการ (ข้อ 16) ══ -->
+            <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-4">
+                <label class="text-xs font-bold text-gray-600">16. วันและสถานที่ดำเนินโครงการ</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1"><label class="text-[11px] font-bold text-gray-400">วันที่ดำเนินโครงการ</label><input id="f6-date" class="input-flat w-full bg-gray-50" placeholder="ระบุวันที่..."></div>
+                    <div class="space-y-1"><label class="text-[11px] font-bold text-gray-400">สถานที่ดำเนินโครงการ</label><input id="f6-place" class="input-flat w-full bg-gray-50" placeholder="ระบุสถานที่..."></div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[11px] font-bold text-gray-400">รูปแบบการดำเนินงาน</label>
+                    <div class="flex gap-6">
+                        <label class="flex items-center gap-2 text-sm"><input type="radio" name="f6-mode" value="Onsite" class="accent-indigo-600"><span>Onsite</span></label>
+                        <label class="flex items-center gap-2 text-sm"><input type="radio" name="f6-mode" value="Online" class="accent-indigo-600"><span>Online</span></label>
+                        <label class="flex items-center gap-2 text-sm"><input type="radio" name="f6-mode" value="แบบผสมผสาน" class="accent-indigo-600"><span>แบบผสมผสาน (Onsite & Online)</span></label>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-4 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <p class="text-[11px] font-bold text-gray-500">กรณีดำเนินโครงการเป็นระยะ ให้ระบุแยกระยะให้ชัดเจน (ตั้งต้น 0 แถว สามารถกด + เพิ่มได้)</p>
+                        <button onclick="App.f6AddPhaseRow()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 no-print"><i data-lucide="plus" size="14"></i> เพิ่มระยะ</button>
+                    </div>
+                    <div id="f6-phase-rows" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION G: การดำเนินโครงการ — ปฏิทินไตรมาส (ข้อ 17) ══ -->
+            <div class="space-y-3">
+                <label class="text-xs font-bold text-gray-600">17. การดำเนินโครงการ</label>
+                <div class="flex justify-end no-print"><button onclick="App.f6AddActivityRow()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2"><i data-lucide="plus" size="14"></i> เพิ่มกิจกรรมย่อย</button></div>
+                <div class="card-main p-4 bg-white border border-indigo-50 rounded-[1.5rem] overflow-hidden">
+                    <div class="overflow-auto">
+                        <table class="w-full text-left text-xs min-w-[1100px]">
+                            <thead class="table-header">
+                                <tr class="bg-indigo-50/40">
+                                    <th class="px-3 py-3 min-w-[220px]">กิจกรรม</th>
+                                    ${['ต.ค.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.'].map(m => `<th class="px-2 py-3 text-center">${m}</th>`).join('')}
+                                    <th class="w-10 no-print"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="f6-activity-rows" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                    <p class="text-[10px] text-gray-400 font-bold mt-2">ติ๊กเดือนที่มีกิจกรรมในแต่ละแถว</p>
+                </div>
+            </div>
+
+            <!-- ══ SECTION H: แผนการเบิกจ่ายงบประมาณ (ข้อ 18) ══ -->
+            <div class="space-y-3">
+                <label class="text-xs font-bold text-gray-600">18. แผนการเบิกจ่ายงบประมาณ</label>
+                <div class="card-main p-4 bg-white border border-indigo-50 rounded-[1.5rem] overflow-hidden">
+                    <div class="overflow-auto">
+                        <table class="w-full text-left text-xs min-w-[1000px]">
+                            <thead class="table-header">
+                                <tr class="bg-indigo-50/40">
+                                    <th class="px-3 py-3">แผนการเบิกจ่ายงบประมาณ (บาท)</th>
+                                    ${['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].map((m,i) => `<th class="px-2 py-3 text-center">${['ต.ค.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.'][i]}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="px-3 py-2 font-bold text-gray-500">จำนวนเงิน</td>
+                                    ${['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].map(m => `<td class="px-1 py-2"><input id="f6-disb-${m}" type="number" min="0" step="0.01" class="input-flat w-24 bg-white text-xs" placeholder="0.00" onchange="App.f6RecalcBudget()"></td>`).join('')}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-400 font-bold">(โปรดแนบแผนปฏิบัติราชการประจำปีที่ปรากฏชื่อโครงการด้วยเพื่อประกอบการอนุมัติดำเนินโครงการ)</p>
+                <div class="flex items-center gap-3">
+                    <input id="f6-plan-pdf" type="file" accept="application/pdf" class="text-xs">
+                    <span class="text-[10px] font-bold text-gray-400">*แนบไฟล์ PDF ขนาดไม่เกิน 10MB</span>
+                </div>
+            </div>
+
+            <!-- ══ SECTION I: รายละเอียดงบประมาณ (ข้อ 19) ══ -->
+            <div class="space-y-3">
+                <label class="text-xs font-bold text-red-500">* 19. รายละเอียดงบประมาณที่ใช้ในการจัดโครงการ (ส่วนที่ 1)</label>
+                <p class="text-[11px] text-gray-400 font-bold">กรณีมีหลายระยะ ให้แยกค่าใช้จ่ายในแต่ละระยะให้ชัดเจน — ระบุในช่อง "ระยะที่" ของแต่ละหมวด</p>
+
+                ${[
+                    { key: 'compensation', title: '1. ค่าตอบแทน', color: 'indigo' },
+                    { key: 'service',      title: '2. ค่าใช้สอย', color: 'purple' },
+                    { key: 'material',     title: '3. ค่าวัสดุ',   color: 'emerald' }
+                ].map(group => `
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-3">
+                    <div class="flex justify-between items-center">
+                        <div class="font-bold text-sm text-${group.color}-800">${group.title}</div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-bold text-gray-400">รวม</span>
+                            <span id="f6-sum-${group.key}" class="font-black text-${group.color}-700">0.00</span>
+                            <span class="text-xs font-bold text-gray-400">บาท</span>
+                            <button onclick="App.f6AddBudgetRow('${group.key}')" class="bg-${group.color}-600 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 no-print"><i data-lucide="plus" size="13"></i> เพิ่มแถว</button>
+                        </div>
+                    </div>
+                    <div class="overflow-auto">
+                        <table class="w-full text-left text-xs min-w-[600px]">
+                            <thead class="table-header">
+                                <tr class="bg-${group.color}-50/40">
+                                    <th class="px-3 py-2 w-28">ระยะที่</th>
+                                    <th class="px-3 py-2">รายการ</th>
+                                    <th class="px-3 py-2 w-36 text-right">จำนวนเงิน (บาท)</th>
+                                    <th class="w-10 no-print"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="f6-budget-${group.key}-rows" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>`).join('')}
+
+                <div class="card-main p-6 bg-indigo-50/30 border border-indigo-100 rounded-[1.5rem] flex justify-between items-center">
+                    <span class="font-black text-indigo-900">รวมงบประมาณทั้งสิ้น (ส่วนที่ 1)</span>
+                    <span class="font-black text-2xl text-indigo-700"><span id="f6-total-amount">0.00</span> บาท</span>
+                </div>
+
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-2">
+                    <label class="text-xs font-bold text-gray-600">ส่วนที่ 2 งบประมาณที่ใช้ในการติดตามผลการนำไปใช้ประโยชน์ของผู้รับบริการหลังจากการรับบริการไปแล้ว</label>
+                    <p class="text-[11px] text-gray-400 font-bold">(ถ้ามีให้แสดงรายละเอียดงบประมาณที่ใช้ในการติดตามผลฯ และต้องเบิกจ่ายภายในปีงบประมาณนั้นๆ)</p>
+                    <textarea id="f6-followup-budget" class="input-flat w-full" rows="3" placeholder="โปรดระบุ (ถ้ามี)..."></textarea>
+                </div>
+            </div>
+
+            <!-- ══ SECTION J: ผลที่คาดว่าจะได้รับ (ข้อ 20) ══ -->
+            <div class="space-y-3">
+                <label class="text-xs font-bold text-gray-600">20. ผลที่คาดว่าจะได้รับ (ต้องสอดคล้องกับวัตถุประสงค์โครงการ)</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="card-main p-5 bg-white border border-indigo-50 rounded-[1.5rem] space-y-2">
+                        <label class="text-[11px] font-bold text-gray-500">20.1 ผลลัพธ์บั้นปลายของโครงการ (Ultimate Outcome)</label>
+                        <textarea id="f6-outcome-ultimate" class="input-flat w-full" rows="3" placeholder="โปรดระบุผลที่คาดว่าจะได้รับและค่าเป้าหมาย..."></textarea>
+                    </div>
+                    <div class="card-main p-5 bg-white border border-indigo-50 rounded-[1.5rem] space-y-2">
+                        <label class="text-[11px] font-bold text-gray-500">20.2 ผลลัพธ์ (Outcome)</label>
+                        <textarea id="f6-outcome-mid" class="input-flat w-full" rows="3" placeholder="โปรดระบุผลที่คาดว่าจะได้รับและค่าเป้าหมาย..."></textarea>
+                    </div>
+                    <div class="card-main p-5 bg-white border border-indigo-50 rounded-[1.5rem] space-y-2">
+                        <label class="text-[11px] font-bold text-gray-500">20.3 ผลผลิตของโครงการ (Output)</label>
+                        <textarea id="f6-outcome-output" class="input-flat w-full" rows="3" placeholder="โปรดระบุผลที่คาดว่าจะได้รับและค่าเป้าหมาย..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SECTION K: การประเมินผลโครงการ / ตัวชี้วัด (ข้อ 21) ══ -->
+            <div class="space-y-3">
+                <label class="text-xs font-bold text-gray-600">21. การประเมินผลโครงการ (ระบุผลการดำเนินโครงการ ตอบสนองตัวชี้วัดและค่าเป้าหมายข้อใด)</label>
+
+                <!-- 21.1 ตัวชี้วัดตามแผนพัฒนามหาวิทยาลัยฯ ฉบับที่ 13 -->
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-3">
+                    <div class="flex justify-between items-center">
+                        <div class="font-bold text-sm">21.1 สอดคล้องกับตัวชี้วัดความสำเร็จตามแผนพัฒนามหาวิทยาลัยฯ ฉบับที่ 13 (พ.ศ. 2566 – 2570)</div>
+                        <button onclick="App.f6AddKpiRow('plan13')" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 no-print"><i data-lucide="plus" size="13"></i> เพิ่มแถว</button>
+                    </div>
+                    <div class="f4-cell !p-0">
+                        <label class="f4-cell-label">ฉบับแผนพัฒนามหาวิทยาลัย</label>
+                        <select id="f6-plan13-plan" class="f4-cell-input bg-gray-50"></select>
+                    </div>
+                    <div class="overflow-auto">
+                        <table class="w-full text-left text-xs min-w-[560px]">
+                            <thead class="table-header"><tr class="bg-indigo-50/40"><th class="px-3 py-2">ตัวชี้วัดตามแผนพัฒนามหาวิทยาลัยฯ</th><th class="px-3 py-2 w-32">หน่วยนับ</th><th class="px-3 py-2 w-28">จำนวน</th><th class="w-10 no-print"></th></tr></thead>
+                            <tbody id="f6-kpi-plan13-rows" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 21.2 ตัวชี้วัดความสำเร็จของโครงการ -->
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-3">
+                    <div class="flex justify-between items-center">
+                        <div class="font-bold text-sm">21.2 สอดคล้องกับตัวชี้วัดความสำเร็จของโครงการ</div>
+                        <button onclick="App.f6AddKpiRow('project')" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 no-print"><i data-lucide="plus" size="13"></i> เพิ่มแถว</button>
+                    </div>
+                    <div class="overflow-auto">
+                        <table class="w-full text-left text-xs min-w-[560px]">
+                            <thead class="table-header"><tr class="bg-indigo-50/40"><th class="px-3 py-2">ตัวชี้วัดโครงการ</th><th class="px-3 py-2 w-32">หน่วยนับ</th><th class="px-3 py-2 w-28">จำนวน</th><th class="w-10 no-print"></th></tr></thead>
+                            <tbody id="f6-kpi-project-rows" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 21.3 ตัวชี้วัดยุทธศาสตร์การจัดสรรงบประมาณ -->
+                <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-4">
+                    <div class="font-bold text-sm">21.3 สอดคล้องกับตัวชี้วัดความสำเร็จตามยุทธศาสตร์การจัดสรรงบประมาณรายจ่ายประจำปีงบประมาณ พ.ศ. <input id="f6-budget-strat-year" class="input-flat inline-block w-24 py-1 px-2 text-xs"></div>
+                    <p class="text-[11px] text-gray-400 font-bold">เลือกผลผลิตที่สอดคล้อง (เลือกได้มากกว่า 1)</p>
+
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-3 text-sm"><input type="checkbox" id="f6-output-academic" class="accent-indigo-600" onchange="App.f6ToggleOutputBlock('academic')"><span class="font-bold">ผลผลิต: ผลงานการให้บริการวิชาการ</span></label>
+                        <div id="f6-output-academic-block" class="hidden pl-6 space-y-2">
+                            <div class="flex items-center gap-3 text-xs"><span class="flex-1">1. จำนวนผู้ประกอบการ/ผู้รับบริการ ได้รับการพัฒนาทักษะ (Up-skilling/Re-skilling)</span><input id="f6-academic-1-unit" class="input-flat w-20 text-xs" placeholder="ราย"><input id="f6-academic-1-val" type="number" class="input-flat w-20 text-xs" placeholder="0"></div>
+                            <div class="flex items-center gap-3 text-xs"><span class="flex-1">2. ร้อยละความพึงพอใจของผู้รับบริการของมหาวิทยาลัย</span><input id="f6-academic-2-unit" class="input-flat w-20 text-xs" value="ร้อยละ" placeholder="ร้อยละ"><input id="f6-academic-2-val" type="number" class="input-flat w-20 text-xs" value="85" placeholder="85"></div>
+                        </div>
+
+                        <label class="flex items-center gap-3 text-sm"><input type="checkbox" id="f6-output-culture" class="accent-indigo-600" onchange="App.f6ToggleOutputBlock('culture')"><span class="font-bold">ผลผลิต: ผลงานทำนุบำรุงศิลปวัฒนธรรม</span></label>
+                        <div id="f6-output-culture-block" class="hidden pl-6 space-y-2">
+                            <div class="flex items-center gap-3 text-xs"><span class="flex-1">พันธุกรรมพืชของไทยได้รับการอนุรักษ์และนำไปใช้ประโยชน์</span><input id="f6-culture-1-unit" class="input-flat w-20 text-xs" placeholder="ชนิด"><input id="f6-culture-1-val" type="number" class="input-flat w-20 text-xs" placeholder="0"></div>
+                            <div class="flex items-center gap-3 text-xs"><span class="flex-1">จำนวนองค์ความรู้ด้านทำนุบำรุงศาสนา ศิลปะ วัฒนธรรม และสิ่งแวดล้อม ร่วมกับชุมชน สังคม องค์กร ที่ได้รับการเผยแพร่บนสื่อเทคโนโลยี</span><input id="f6-culture-2-unit" class="input-flat w-20 text-xs" placeholder="องค์ความรู้"><input id="f6-culture-2-val" type="number" class="input-flat w-20 text-xs" placeholder="0"></div>
+                        </div>
+
+                        <label class="flex items-center gap-3 text-sm"><input type="checkbox" id="f6-output-workforce" class="accent-indigo-600" onchange="App.f6ToggleOutputBlock('workforce')"><span class="font-bold">โครงการพัฒนาศักยภาพกำลังคนสมรรถนะสูงเพื่อรองรับอุตสาหกรรมเป้าหมายของประเทศ</span></label>
+                        <div id="f6-output-workforce-block" class="hidden pl-6 space-y-2">
+                            <div class="flex items-center gap-3 text-xs"><span class="flex-1">1. จำนวนผู้ประกอบการ/ผู้รับบริการได้รับการพัฒนาทักษะ (Up-skilling/Re-skilling)</span><input id="f6-workforce-1-unit" class="input-flat w-20 text-xs" placeholder="ราย"><input id="f6-workforce-1-val" type="number" class="input-flat w-20 text-xs" placeholder="0"></div>
+                            <div class="flex items-center gap-3 text-xs"><input id="f6-workforce-2-label" class="input-flat flex-1 text-xs" placeholder="โปรดระบุ..."><input id="f6-workforce-2-unit" class="input-flat w-20 text-xs" placeholder="หน่วยนับ"><input id="f6-workforce-2-val" type="number" class="input-flat w-20 text-xs" placeholder="0"></div>
+                        </div>
+
+                        <label class="flex items-center gap-3 text-sm"><input type="checkbox" id="f6-output-other" class="accent-indigo-600" onchange="App.f6ToggleOutputBlock('other')"><span class="font-bold">โครงการอื่น โปรดระบุ</span><input id="f6-output-other-name" class="input-flat flex-1 py-1 px-2 text-xs ml-1" placeholder="ระบุชื่อโครงการ..."></label>
+                        <div id="f6-output-other-block" class="hidden pl-6 space-y-2">
+                            <div class="flex items-center gap-3 text-xs"><input id="f6-other-1-label" class="input-flat flex-1 text-xs" placeholder="โปรดระบุดัชนีชี้วัด..."><input id="f6-other-1-unit" class="input-flat w-20 text-xs" placeholder="หน่วยนับ"><input id="f6-other-1-val" type="number" class="input-flat w-20 text-xs" placeholder="0"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-[11px] text-gray-400 font-bold">หมายเหตุ: หน่วยงานต้องรายงานผลการดำเนินงานของตัวชี้วัดตามยุทธศาสตร์จัดสรรงบประมาณรายจ่ายประจำปีในผลผลิตที่โครงการสอดคล้อง และส่งแบบฟอร์มสรุปผลการดำเนินโครงการภายใน 30 วัน ให้ กนผ. นับถัดจากวันที่ดำเนินโครงการเรียบร้อยแล้ว</p>
+            </div>
+
+            <!-- ══ SECTION L: ผู้ประสานงานโครงการ (ข้อ 23) ══ -->
+            <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-4">
+                <label class="text-xs font-bold text-gray-600">23. ข้อมูลผู้ประสานงานโครงการ</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1"><label class="text-[11px] font-bold text-gray-500">ชื่อ - สกุล</label><input id="f6-coord-name" class="input-flat w-full bg-gray-50" placeholder="ชื่อ - สกุล"></div>
+                    <div class="space-y-1"><label class="text-[11px] font-bold text-gray-500">ตำแหน่ง</label><input id="f6-coord-position" class="input-flat w-full bg-gray-50" placeholder="ตำแหน่ง"></div>
+                    <div class="space-y-1"><label class="text-[11px] font-bold text-gray-500">เบอร์โทรศัพท์ที่ทำงาน</label><input id="f6-coord-phone-office" class="input-flat w-full bg-gray-50" placeholder="เบอร์โทรศัพท์ที่ทำงาน"></div>
+                    <div class="space-y-1"><label class="text-[11px] font-bold text-gray-500">โทรศัพท์มือถือ</label><input id="f6-coord-phone-mobile" class="input-flat w-full bg-gray-50" placeholder="โทรศัพท์มือถือ"></div>
+                    <div class="space-y-1 md:col-span-2"><label class="text-[11px] font-bold text-gray-500">E-mail Address</label><input id="f6-coord-email" class="input-flat w-full bg-gray-50" placeholder="E-mail Address"></div>
+                </div>
+            </div>
+
+            <!-- ลงนามเฉพาะตอนพิมพ์ -->
+            <div class="hidden print:block mt-20 space-y-16">
+                <div class="flex justify-between px-20 text-center text-sm font-bold">
+                    <div>
+                        <p>ลงชื่อ ..................................................ผู้เสนอโครงการ</p>
+                        <p>(..................................................)</p>
+                        <p>วันที่..................................................</p>
+                    </div>
+                    <div>
+                        <p>ลงชื่อ ..................................................หัวหน้าสาขา/งาน</p>
+                        <p>(..................................................)</p>
+                        <p>วันที่..................................................</p>
+                    </div>
+                </div>
+                <div class="text-center px-20 text-sm font-bold">
+                    <p>ลงชื่อ ..................................................หัวหน้าหน่วยงาน</p>
+                    <p>(..................................................)</p>
+                    <p>วันที่..................................................</p>
+                </div>
+                <p class="text-[10px] text-gray-400 font-bold text-center">หมายเหตุ : หากมีการเปลี่ยนแปลง แก้ไข รายละเอียดของโครงการตามบัญชีแนบท้ายคำสั่ง 350/2567</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ===== ปุ่มล่างสุด บันทึก / ล้างค่า / Print ===== -->
+    <div class="no-print mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <button onclick="App.saveForm6()"
+            class="flex-1 sm:flex-none sm:w-56 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black shadow-xl flex items-center justify-center gap-3 text-base transition-all">
+            <i data-lucide="save" class="w-5 h-5"></i> บันทึก
+        </button>
+        <button onclick="App.resetForm6()"
+            class="flex-1 sm:flex-none sm:w-44 bg-white text-gray-500 py-4 rounded-2xl font-bold shadow-sm border border-gray-200 flex items-center justify-center gap-3 text-base hover:bg-gray-50 transition-all">
+            <i data-lucide="refresh-ccw" class="w-5 h-5"></i> ล้างค่า
+        </button>
+        <button onclick="window.print()"
+            class="flex-1 sm:flex-none sm:w-44 bg-slate-700 hover:bg-slate-800 text-white py-4 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-3 text-base transition-all">
+            <i data-lucide="printer" class="w-5 h-5"></i> Print / PDF
+        </button>
+    </div>
+
+    <!-- ===== ตารางรายการที่บันทึก ===== -->
+    <div class="no-print mt-12 rounded-[2rem] bg-white border border-indigo-100 shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between gap-4 px-8 py-5 border-b border-indigo-50 bg-indigo-50/40">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
+                    <i data-lucide="database" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <div class="font-black text-indigo-950 text-base">รายการที่บันทึกแล้ว (ง.6)</div>
+                    <div class="text-[11px] font-bold text-gray-400">คลิก ✏️ เพื่อแก้ไข &nbsp;|&nbsp; 🖨️ เพื่อ Print/PDF &nbsp;|&nbsp; 🗑️ เพื่อลบ</div>
+                </div>
+            </div>
+            <button onclick="App.loadForm6Records()"
+                class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-indigo-600 border border-indigo-50 transition-all" title="รีเฟรช">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm min-w-[700px]">
+                <thead class="table-header">
+                    <tr>
+                        <th class="px-4 py-4 text-center w-12">#</th>
+                        <th class="px-4 py-4">ชื่อโครงการ</th>
+                        <th class="px-4 py-4">หน่วยงาน</th>
+                        <th class="px-4 py-4 text-right">งบประมาณ</th>
+                        <th class="px-4 py-4">ผู้บันทึก</th>
+                        <th class="px-4 py-4">วันที่บันทึก</th>
+                        <th class="px-4 py-4 text-center w-36">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="f6-records-tbody" class="divide-y divide-gray-50">
+                    <tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">กำลังโหลด...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<!-- Admin Edit Modal Root (เฉพาะหน้า ตั้งต้นข้อมูล) -->
+<div id="admin-edit-modal" class="hidden"></div>`;
+}
+
 };
 /* ===== RENDER TABLE ===== */
 

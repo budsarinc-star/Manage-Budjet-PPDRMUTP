@@ -101,6 +101,7 @@ const App = {
         } else if (page === 'manage') {
             view.innerHTML = UI.managePage(subId);
             if (subId === 'tab1') this.initManageForm4();
+            if (subId === 'tab3') this.initManageForm6();
         }
         lucide.createIcons();
     },
@@ -231,12 +232,21 @@ const App = {
                     return false;
                 }).map(l => ({ id: l.planId, name: l.planName || l.planId }));
                 // fallback: ถ้า strat_links ยังไม่มีข้อมูล ใช้ plans ปกติ
-                const planOpts = plansFromLinks.length ? plansFromLinks : cache.plans;
+                const planOpts = this.f4SortByName(plansFromLinks.length ? plansFromLinks : cache.plans);
                 planSel.innerHTML = '<option value="">— เลือกฉบับแผน —</option>' +
                     planOpts.map(p => `<option value="${p.id}">${p.name||p.label||p.id}</option>`).join('');
                 planSel.disabled = false;
                 planSel.classList.remove('f4-placeholder');
             }
+
+            // ── init multi-row containers (Step 4,5,7) ให้เริ่มต้นว่างเปล่า ──
+            if (!this._f4MultiOptions) this._f4MultiOptions = { dimension: [], substrategy: [], kpi: [] };
+            ['dimension','substrategy','kpi'].forEach(step => {
+                const container = document.getElementById(step === 'kpi' ? 'f-kpi-multi-rows' : `f-${step}-rows`);
+                if (container && !container.children.length) {
+                    this.f4RenderMultiRows(step, [], '— เลือกขั้นตอนด้านบนก่อน —');
+                }
+            });
 
             // ── ข้อ 13: หน่วยนับ (populate ทุก select หน่วยนับในส่วนมาตรฐานขั้นต่ำ) ──
             ['f-min-std-unit','f-have-total-unit','f-have-ok-unit','f-have-broken-unit'].forEach(uid => {
@@ -355,7 +365,7 @@ const App = {
         const ids = [
             'f-dept','f-year','f-branch','f-budget-source','f-budget-other',
             'f-item','f-item-desc','f-category','f-building-name','f-building-year','f-building-note',
-            'f-plan','f-issue','f-strategy','f-substrategy','f-dimension','f-kpidim','f-kpi',
+            'f-plan','f-issue','f-strategy','f-kpidim',
             'f-need','f-objective2',
             'f-min-std','f-min-std-unit','f-have-total','f-have-total-unit',
             'f-have-ok','f-have-ok-unit','f-have-broken','f-have-broken-unit'
@@ -383,19 +393,155 @@ const App = {
         document.querySelectorAll('select').forEach(s => {
             if (!s.value) s.classList.add('f4-placeholder');
         });
-        // reset cascade: ล็อก step 2-7 ใหม่
-        ['f-issue','f-strategy','f-dimension','f-substrategy','f-kpidim','f-kpi'].forEach(id => {
+        // reset cascade: ล็อก step 2,3,6 ใหม่ (select เดี่ยว)
+        ['f-issue','f-strategy','f-kpidim'].forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
             el.disabled = true;
             el.innerHTML = `<option value="">— เลือกขั้นตอนด้านบนก่อน —</option>`;
             el.classList.add('f4-placeholder');
         });
+        // reset cascade: ล็อก step 4,5,7 ใหม่ (multi-row)
+        ['dimension','substrategy','kpi'].forEach(step => {
+            this._f4MultiOptions[step] = [];
+            this.f4RenderMultiRows(step, [], '— เลือกขั้นตอนด้านบนก่อน —');
+        });
     },
 
     // ── Cascade Step handler ──────────────────────────────────────────
     // ดึงข้อมูลจาก strat_links (ตารางที่ 2 หน้าผู้ดูแลระบบ) เพื่อ filter cascade
+    // Step 1,2,3,6 = เลือกได้ 1 คำตอบ (select เดี่ยว)
+    // Step 4,5,7   = เลือกได้หลายคำตอบ (multi-row select, เพิ่ม/ลบแถวได้)
     // step: 'plan' | 'issue' | 'strategy' | 'dimension' | 'substrategy' | 'kpidim'
+
+    // เก็บ options ปัจจุบันของ multi-row แต่ละ step (สำหรับ re-render เวลาเพิ่ม/ลบแถว)
+    _f4MultiOptions: { dimension: [], substrategy: [], kpi: [] },
+
+    // ── Natural sort: เรียงตามเลขนำหน้าในชื่อ เช่น "1.1, 1.4, 1.5, 1.10" ──
+    // รองรับชื่อแบบ "กลยุทธ์ย่อยที่ 1.1 Common Knowledge..." โดยดึงเลขทั้งหมดในชื่อ
+    // มาเทียบเป็นชุด (1,1) (1,4) (1,5) (1,10) ทีละตำแหน่งแบบตัวเลขจริง ไม่ใช่ string
+    f4NaturalCompare(a, b) {
+        const nameA = (a.name || a.id || '').toString();
+        const nameB = (b.name || b.id || '').toString();
+        const numsA = nameA.match(/\d+(\.\d+)*/g) || [];
+        const numsB = nameB.match(/\d+(\.\d+)*/g) || [];
+        const partsA = (numsA[0] || '').split('.').map(Number);
+        const partsB = (numsB[0] || '').split('.').map(Number);
+        const len = Math.max(partsA.length, partsB.length);
+        for (let i = 0; i < len; i++) {
+            const x = partsA[i] === undefined ? -1 : partsA[i];
+            const y = partsB[i] === undefined ? -1 : partsB[i];
+            if (x !== y) return x - y;
+        }
+        // ถ้าเลขนำหน้าเท่ากันหมด (หรือไม่มีเลขเลยทั้งคู่) ให้ fallback เรียงตามชื่อแบบ locale compare
+        return nameA.localeCompare(nameB, 'th');
+    },
+
+    f4SortByName(items) {
+        return [...items].sort((a, b) => this.f4NaturalCompare(a, b));
+    },
+
+    fromLinks(links, filterFn, idField, nameField) {
+        const seen = new Set();
+        const result = [];
+        for (const lnk of links) {
+            if (filterFn(lnk) && lnk[idField] && !seen.has(lnk[idField])) {
+                seen.add(lnk[idField]);
+                result.push({ id: lnk[idField], name: lnk[nameField] || lnk[idField] });
+            }
+        }
+        // เรียงตามเลขนำหน้าในชื่อ (natural sort) ไม่ใช่ตามวันที่บันทึก
+        return this.f4SortByName(result);
+    },
+
+    // อ่านค่าทั้งหมดที่เลือกไว้ในแถวของ multi-row container (array of ids ที่ไม่ว่าง)
+    f4GetMultiValues(step) {
+        const containerId = step === 'kpi' ? 'f-kpi-multi-rows' : `f-${step}-rows`;
+        const container = document.getElementById(containerId);
+        if (!container) return [];
+        return Array.from(container.querySelectorAll('select'))
+            .map(s => s.value).filter(Boolean);
+    },
+
+    // วาด select ใหม่ทุกแถวของ multi-row container ตาม options ที่กำหนด คงค่าที่เลือกไว้เดิมถ้ายังมีอยู่ใน options ใหม่
+    f4RenderMultiRows(step, options, placeholder, onChangeStep) {
+        const containerId = step === 'kpi' ? 'f-kpi-multi-rows' : `f-${step}-rows`;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        this._f4MultiOptions[step] = options || [];
+
+        const prevValues = this.f4GetMultiValues(step);
+        const hasData = (options || []).length > 0;
+
+        const buildOptionsHtml = (selectedVal) => {
+            let html = `<option value="">${hasData ? placeholder : '— ไม่มีข้อมูล —'}</option>`;
+            (options || []).forEach(o => {
+                const sel = o.id === selectedVal ? 'selected' : '';
+                html += `<option value="${o.id}" ${sel}>${o.name}</option>`;
+            });
+            return html;
+        };
+
+        // ถ้ายังไม่มีแถวเลย หรือค่าที่เลือกไว้ทั้งหมดไม่อยู่ใน options ใหม่ ให้เริ่มจาก 1 แถวเปล่า
+        let keepValues = prevValues.filter(v => (options || []).some(o => o.id === v));
+        if (!keepValues.length) keepValues = [''];
+
+        container.innerHTML = keepValues.map(v => `
+            <select class="f4-strat-select f4-multi-select" data-step="${step}" ${hasData ? '' : 'disabled'}
+                onchange="App.f4OnMultiChange('${step}', '${onChangeStep || ''}')">
+                ${buildOptionsHtml(v)}
+            </select>
+        `).join('');
+
+        container.querySelectorAll('select').forEach(s => {
+            if (!s.value) s.classList.add('f4-placeholder'); else s.classList.remove('f4-placeholder');
+        });
+    },
+
+    // เพิ่มแถวใหม่ใน multi-row container (ใช้ options ที่ cache ไว้ล่าสุด)
+    f4AddMultiRow(step) {
+        const containerId = step === 'kpi' ? 'f-kpi-multi-rows' : `f-${step}-rows`;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const options = this._f4MultiOptions[step] || [];
+        const hasData = options.length > 0;
+        if (!hasData) return alert('ยังไม่มีข้อมูลให้เลือกเพิ่ม กรุณาเลือกขั้นตอนก่อนหน้าให้ครบก่อน');
+
+        const onChangeStep = step === 'dimension' ? 'dimension' : (step === 'substrategy' ? 'substrategy' : '');
+        const sel = document.createElement('select');
+        sel.className = 'f4-strat-select f4-multi-select f4-placeholder';
+        sel.dataset.step = step;
+        sel.setAttribute('onchange', `App.f4OnMultiChange('${step}','${onChangeStep}')`);
+        sel.innerHTML = `<option value="">เลือก...</option>` + options.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+        container.appendChild(sel);
+        lucide.createIcons();
+    },
+
+    // ลบแถวสุดท้าย (กันลบหมด เหลืออย่างน้อย 1 แถว) แล้ว trigger cascade ต่อ
+    f4RemoveMultiRow(step) {
+        const containerId = step === 'kpi' ? 'f-kpi-multi-rows' : `f-${step}-rows`;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const rows = container.querySelectorAll('select');
+        if (rows.length <= 1) {
+            rows[0] && (rows[0].value = '');
+        } else {
+            rows[rows.length - 1].remove();
+        }
+        // re-trigger cascade ขั้นต่อไปจาก step นี้
+        if (step === 'dimension') this.f4CascadeStep('dimension');
+        else if (step === 'substrategy') this.f4CascadeStep('substrategy');
+    },
+
+    // เมื่อมีการเปลี่ยนค่าใน select ของ multi-row (step 4 หรือ 5) ให้ trigger cascade ต่อ
+    f4OnMultiChange(step, onChangeStep) {
+        document.querySelectorAll(`#${step === 'kpi' ? 'f-kpi-multi-rows' : `f-${step}-rows`} select`).forEach(s => {
+            if (!s.value) s.classList.add('f4-placeholder'); else s.classList.remove('f4-placeholder');
+        });
+        if (onChangeStep) this.f4CascadeStep(onChangeStep);
+    },
+
     f4CascadeStep(step) {
         const cache = this._f4cache;
         if (!cache) return;
@@ -418,27 +564,15 @@ const App = {
             el.innerHTML = `<option value="">${uniq.length ? placeholder : '— ไม่มีข้อมูล —'}</option>` +
                 uniq.map(x => `<option value="${x.id}">${x.name||x.label||x.id}</option>`).join('');
             if (!el.value) el.classList.add('f4-placeholder');
-            // ไม่ทับ onchange attribute ที่ตั้งไว้ใน HTML — ใช้ addEventListener แทน
             el.addEventListener('change', () => el.value ? el.classList.remove('f4-placeholder') : el.classList.add('f4-placeholder'));
         };
-        const fromLinks = (filterFn, idField, nameField) => {
-            const seen = new Set();
-            const result = [];
-            for (const lnk of links) {
-                if (filterFn(lnk) && lnk[idField] && !seen.has(lnk[idField])) {
-                    seen.add(lnk[idField]);
-                    result.push({ id: lnk[idField], name: lnk[nameField] || lnk[idField] });
-                }
-            }
-            return result;
-        };
-
-        // helper: filter แบบ progressive — ถ้า strict ไม่เจอ ให้ relax filter ทีละขั้น
+        const fromLinks = (filterFn, idField, nameField) => this.fromLinks(links, filterFn, idField, nameField);
         const strictOrRelax = (strictFn, relaxFn, idField, nameField) => {
             const strict = fromLinks(strictFn, idField, nameField);
             if (strict.length) return strict;
             return fromLinks(relaxFn, idField, nameField);
         };
+        const lockMulti = (step2) => this.f4RenderMultiRows(step2, [], '— เลือกขั้นตอนก่อนหน้า —');
 
         if (step === 'plan') {
             const planId = val('f-plan');
@@ -446,16 +580,15 @@ const App = {
                 ? fromLinks(l => l.planId === planId, 'issueId', 'issueName')
                 : [];
             fill('f-issue', issues, '— เลือกประเด็นยุทธศาสตร์ —');
-            lock('f-strategy',    '— เลือกประเด็นก่อน —');
-            lock('f-dimension',   '— เลือกวัตถุประสงค์ก่อน —');
-            lock('f-substrategy', '— เลือกกลยุทธ์ก่อน —');
-            lock('f-kpidim',      '— เลือกกลยุทธ์ก่อน —');
-            lock('f-kpi',         '— เลือกมิติก่อน —');
+            lock('f-strategy', '— เลือกประเด็นก่อน —');
+            lockMulti('dimension');
+            lockMulti('substrategy');
+            lock('f-kpidim', '— เลือกกลยุทธ์ก่อน —');
+            lockMulti('kpi');
         }
         else if (step === 'issue') {
             const planId  = val('f-plan');
             const issueId = val('f-issue');
-            // strict: planId+issueId, relax: issueId เท่านั้น (กัน planId ไม่ match)
             const strats = issueId
                 ? strictOrRelax(
                     l => l.planId === planId && l.issueId === issueId,
@@ -463,10 +596,10 @@ const App = {
                     'strategyId', 'strategyName')
                 : [];
             fill('f-strategy', strats, '— เลือกวัตถุประสงค์เชิงยุทธศาสตร์ —');
-            lock('f-dimension',   '— เลือกวัตถุประสงค์ก่อน —');
-            lock('f-substrategy', '— เลือกกลยุทธ์ก่อน —');
-            lock('f-kpidim',      '— เลือกกลยุทธ์ก่อน —');
-            lock('f-kpi',         '— เลือกมิติก่อน —');
+            lockMulti('dimension');
+            lockMulti('substrategy');
+            lock('f-kpidim', '— เลือกกลยุทธ์ก่อน —');
+            lockMulti('kpi');
         }
         else if (step === 'strategy') {
             const planId     = val('f-plan');
@@ -478,65 +611,98 @@ const App = {
                     l => l.issueId === issueId && l.strategyId === strategyId,
                     'dimId', 'dimName')
                 : [];
-            fill('f-dimension', dims, '— เลือกกลยุทธ์ —');
-            lock('f-substrategy', '— เลือกกลยุทธ์ก่อน —');
-            lock('f-kpidim',      '— เลือกกลยุทธ์ก่อน —');
-            lock('f-kpi',         '— เลือกมิติก่อน —');
+            // Step 4: กลยุทธ์ (multi-row)
+            this.f4RenderMultiRows('dimension', dims, '— เลือกกลยุทธ์ —', 'dimension');
+            lockMulti('substrategy');
+            lock('f-kpidim', '— เลือกกลยุทธ์ก่อน —');
+            lockMulti('kpi');
         }
         else if (step === 'dimension') {
-            const planId     = val('f-plan');
-            const issueId    = val('f-issue');
-            const strategyId = val('f-strategy');
-            const dimId      = val('f-dimension');
-            // Step 5: แสดงทุก subId ที่ผูกกับ dimId นี้ (รวมที่ต่างกันเฉพาะ sub/kpiDim/kpi)
-            const subs = dimId
-                ? strictOrRelax(
-                    l => l.planId === planId && l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId,
-                    l => l.strategyId === strategyId && l.dimId === dimId,
-                    'subId', 'subName')
-                : [];
-            fill('f-substrategy', subs, '— เลือกกลยุทธ์ย่อย (ถ้ามี) —');
-            // Step 6: มิติ — แสดงทุก kpiDimId ที่ผูกกับ dimId นี้
-            const kpiDims = dimId
-                ? strictOrRelax(
-                    l => l.planId === planId && l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId,
-                    l => l.strategyId === strategyId && l.dimId === dimId,
-                    'kpiDimId', 'kpiDimName')
-                : [];
+            const planId      = val('f-plan');
+            const issueId     = val('f-issue');
+            const strategyId  = val('f-strategy');
+            const dimIds      = this.f4GetMultiValues('dimension'); // หลายอันที่เลือกใน Step 4
+
+            // Step 5: กลยุทธ์ย่อย — รวมข้อมูลจากทุกกลยุทธ์ (dimId) ที่เลือกไว้
+            let subs = [];
+            if (dimIds.length) {
+                dimIds.forEach(dimId => {
+                    const found = strictOrRelax(
+                        l => l.planId === planId && l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId,
+                        l => l.strategyId === strategyId && l.dimId === dimId,
+                        'subId', 'subName');
+                    subs = subs.concat(found);
+                });
+                // dedupe + เรียงตามเลขนำหน้า
+                const seen = new Set();
+                subs = this.f4SortByName(subs.filter(x => !seen.has(x.id) && seen.add(x.id)));
+            }
+            this.f4RenderMultiRows('substrategy', subs, '— เลือกกลยุทธ์ย่อย (ถ้ามี) —', 'substrategy');
+
+            // Step 6: มิติ — รวมข้อมูลจากทุกกลยุทธ์ (dimId) ที่เลือกไว้ (select เดี่ยว)
+            let kpiDims = [];
+            if (dimIds.length) {
+                dimIds.forEach(dimId => {
+                    const found = strictOrRelax(
+                        l => l.planId === planId && l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId,
+                        l => l.strategyId === strategyId && l.dimId === dimId,
+                        'kpiDimId', 'kpiDimName');
+                    kpiDims = kpiDims.concat(found);
+                });
+                const seen2 = new Set();
+                kpiDims = this.f4SortByName(kpiDims.filter(x => !seen2.has(x.id) && seen2.add(x.id)));
+            }
             fill('f-kpidim', kpiDims, '— เลือกมิติ —');
-            lock('f-kpi', '— เลือกมิติก่อน —');
+            lockMulti('kpi');
         }
         else if (step === 'substrategy') {
             const planId     = val('f-plan');
             const issueId    = val('f-issue');
             const strategyId = val('f-strategy');
-            const dimId      = val('f-dimension');
-            const subId      = val('f-substrategy');
-            if (subId) {
-                // เมื่อเลือก subId แล้ว filter มิติให้แคบลง
-                const kpiDims = strictOrRelax(
-                    l => l.planId === planId && l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId && l.subId === subId,
-                    l => l.dimId === dimId && l.subId === subId,
-                    'kpiDimId', 'kpiDimName'
-                );
+            const dimIds     = this.f4GetMultiValues('dimension');
+            const subIds     = this.f4GetMultiValues('substrategy');
+
+            if (subIds.length && dimIds.length) {
+                // filter มิติให้แคบลงตาม dimId + subId ที่เลือกไว้ (รวมทุกคู่ที่เป็นไปได้)
+                let kpiDims = [];
+                dimIds.forEach(dimId => {
+                    subIds.forEach(subId => {
+                        const found = strictOrRelax(
+                            l => l.planId === planId && l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId && l.subId === subId,
+                            l => l.dimId === dimId && l.subId === subId,
+                            'kpiDimId', 'kpiDimName');
+                        kpiDims = kpiDims.concat(found);
+                    });
+                });
+                const seen = new Set();
+                kpiDims = this.f4SortByName(kpiDims.filter(x => !seen.has(x.id) && seen.add(x.id)));
                 fill('f-kpidim', kpiDims, '— เลือกมิติ —');
-                lock('f-kpi', '— เลือกมิติก่อน —');
+                lockMulti('kpi');
             }
         }
         else if (step === 'kpidim') {
             const planId     = val('f-plan');
             const issueId    = val('f-issue');
             const strategyId = val('f-strategy');
-            const dimId      = val('f-dimension');
-            const subId      = val('f-substrategy');
+            const dimIds     = this.f4GetMultiValues('dimension');
             const kpiDimId   = val('f-kpidim');
-            const kpis = kpiDimId
-                ? strictOrRelax(
-                    l => l.planId === planId && l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId && l.kpiDimId === kpiDimId,
-                    l => l.dimId === dimId && l.kpiDimId === kpiDimId,
-                    'kpiId', 'kpiName')
-                : [];
-            fill('f-kpi', kpis, '— เลือกตัวชี้วัด —');
+
+            // Step 7: ตัวชี้วัด (multi-row) — รวมจากทุก dimId ที่เลือกไว้ + kpiDimId ที่เลือก
+            let kpis = [];
+            if (kpiDimId && dimIds.length) {
+                dimIds.forEach(dimId => {
+                    const found = strictOrRelax(
+                        l => l.planId === planId && l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId && l.kpiDimId === kpiDimId,
+                        l => l.dimId === dimId && l.kpiDimId === kpiDimId,
+                        'kpiId', 'kpiName');
+                    kpis = kpis.concat(found);
+                });
+                const seen = new Set();
+                kpis = this.f4SortByName(kpis.filter(x => !seen.has(x.id) && seen.add(x.id)));
+            } else if (kpiDimId && !dimIds.length) {
+                kpis = fromLinks(l => l.kpiDimId === kpiDimId, 'kpiId', 'kpiName');
+            }
+            this.f4RenderMultiRows('kpi', kpis, '— เลือกตัวชี้วัด —');
             this.form4SyncKpiRows();
         }
     },
@@ -561,14 +727,27 @@ const App = {
                 issueName: document.getElementById('f-issue')?.selectedOptions?.[0]?.text || '',
                 strategy: document.getElementById('f-strategy')?.value || '',
                 strategyName: document.getElementById('f-strategy')?.selectedOptions?.[0]?.text || '',
-                dimension: document.getElementById('f-dimension')?.value || '',
-                dimensionName: document.getElementById('f-dimension')?.selectedOptions?.[0]?.text || '',
-                substrategy: document.getElementById('f-substrategy')?.value || '',
-                substrategyName: document.getElementById('f-substrategy')?.selectedOptions?.[0]?.text || '',
+                // กลยุทธ์ (Step 4) — เลือกได้หลายอัน
+                dimensions: Array.from(document.querySelectorAll('#f-dimension-rows select')).filter(s => s.value).map(s => ({
+                    id: s.value, name: s.selectedOptions?.[0]?.text || ''
+                })),
+                // เก็บ field เดิมไว้เพื่อความเข้ากันได้ (ใช้อันแรกที่เลือก)
+                dimension: document.querySelector('#f-dimension-rows select')?.value || '',
+                dimensionName: document.querySelector('#f-dimension-rows select')?.selectedOptions?.[0]?.text || '',
+                // กลยุทธ์ย่อย (Step 5) — เลือกได้หลายอัน
+                substrategies: Array.from(document.querySelectorAll('#f-substrategy-rows select')).filter(s => s.value).map(s => ({
+                    id: s.value, name: s.selectedOptions?.[0]?.text || ''
+                })),
+                substrategy: document.querySelector('#f-substrategy-rows select')?.value || '',
+                substrategyName: document.querySelector('#f-substrategy-rows select')?.selectedOptions?.[0]?.text || '',
                 kpiDim: document.getElementById('f-kpidim')?.value || '',
                 kpiDimName: document.getElementById('f-kpidim')?.selectedOptions?.[0]?.text || '',
-                kpiMain: document.getElementById('f-kpi')?.value || '',
-                kpiMainName: document.getElementById('f-kpi')?.selectedOptions?.[0]?.text || '',
+                // ตัวชี้วัด (Step 7) — เลือกได้หลายอัน
+                kpiMains: Array.from(document.querySelectorAll('#f-kpi-multi-rows select')).filter(s => s.value).map(s => ({
+                    id: s.value, name: s.selectedOptions?.[0]?.text || ''
+                })),
+                kpiMain: document.querySelector('#f-kpi-multi-rows select')?.value || '',
+                kpiMainName: document.querySelector('#f-kpi-multi-rows select')?.selectedOptions?.[0]?.text || '',
                 need: document.getElementById('f-need')?.value || '',
                 objective: document.getElementById('f-objective2')?.value || '',
                 kpiRows: Array.from(document.querySelectorAll('#f-kpi-rows tr')).map(tr => {
@@ -1471,8 +1650,10 @@ _lnkReset(from) {
 _lnkFill(sel, docs, placeholder) {
     if (!sel) return;
     const seen = new Set();
-    const opts = docs.filter(d => d.name && !seen.has(d.name) && seen.add(d.name))
-        .map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    const uniqDocs = docs.filter(d => d.name && !seen.has(d.name) && seen.add(d.name));
+    // เรียงตามเลขนำหน้าในชื่อ (เช่น 1.1, 1.2 ... 1.10) ไม่ใช่ตามลำดับที่โหลดมา/วันที่บันทึก
+    const sortedDocs = this.f4SortByName(uniqDocs.map(d => ({ id: d.id, name: d.name })));
+    const opts = sortedDocs.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
     sel.innerHTML = `<option value="">${placeholder}</option>` + opts;
     // เปิด dropdown เสมอ (แม้ไม่มีข้อมูล ให้แสดง placeholder)
     sel.disabled = false;
@@ -2718,7 +2899,821 @@ async fillDeptSelectForBranches() {
         lucide.createIcons();
     },
     showLoader() { document.getElementById('loader').classList.remove('hidden'); },
-    hideLoader() { document.getElementById('loader').classList.add('hidden'); }
+    hideLoader() { document.getElementById('loader').classList.add('hidden'); },
+
+    /* ============================================================
+       (ง.6) แบบเสนอขอโครงการ — รวมเข้ากับ App object
+       ============================================================ */
+
+
+    /* ---------- INIT ---------- */
+    async initManageForm6() {
+        if (!document.getElementById('f6-dept')) return;
+
+        const setOptions = (sel, items, placeholder = 'โปรดระบุ ...') => {
+            if (!sel) return;
+            const clone = sel.cloneNode(false);
+            clone.onchange = sel.onchange;
+            const empty = document.createElement('option');
+            empty.value = '';
+            empty.textContent = items.length ? placeholder : '— ยังไม่มีข้อมูล —';
+            clone.appendChild(empty);
+            for (const x of items) {
+                const opt = document.createElement('option');
+                opt.value = (x.value ?? x.id ?? '').toString();
+                opt.textContent = (x.label ?? x.name ?? x.value ?? '').toString();
+                clone.appendChild(opt);
+            }
+            clone.disabled = items.length === 0;
+            const syncTint = () => clone.value
+                ? clone.classList.remove('f4-placeholder')
+                : clone.classList.add('f4-placeholder');
+            clone.addEventListener('change', syncTint);
+            syncTint();
+            sel.replaceWith(clone);
+        };
+
+        const getCol = (name) => db.collection('artifacts').doc(appId)
+            .collection('public').doc('data').collection(name);
+
+        try {
+            this.showLoader();
+
+            const [depts, branches, years, issues, strategies, dimensions, units,
+                   budgetTypes, plans, kpiPlan13Master, kpiProjectMaster] = await Promise.all([
+                getCol('depts').orderBy('name').get(),
+                getCol('branches').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('years').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('strat_issues').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('strat_strategies').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('strat_dimensions').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('units').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('budget_types').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('strat_plans').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('kpi_master_plan13').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('kpi_master_project').orderBy('name').get().catch(() => ({ docs: [] })),
+            ]);
+
+            const mapDocs = (snap) => (snap?.docs || []).map(d => ({ id: d.id, ...d.data() }));
+
+            const cache = this._f6cache = {
+                depts:           mapDocs(depts),
+                branches:        mapDocs(branches),
+                years:           mapDocs(years),
+                issues:          mapDocs(issues),
+                strategies:      mapDocs(strategies),
+                dimensions:      mapDocs(dimensions),
+                units:           mapDocs(units),
+                budgetTypes:     mapDocs(budgetTypes),
+                plans:           mapDocs(plans),
+                kpiPlan13Master: mapDocs(kpiPlan13Master),
+                kpiProjectMaster: mapDocs(kpiProjectMaster),
+            };
+
+            setOptions(document.getElementById('f6-dept'),          cache.depts);
+            setOptions(document.getElementById('f6-branch'),        cache.branches);
+            setOptions(document.getElementById('f6-year'),          cache.years);
+            setOptions(document.getElementById('f6-issue'),         cache.issues, '— เลือกประเด็นยุทธศาสตร์ —');
+            setOptions(document.getElementById('f6-budget-source'), cache.budgetTypes);
+            setOptions(document.getElementById('f6-plan13-plan'),   this.f4SortByName(cache.plans), '— เลือกฉบับแผน —');
+
+            // ตั้งต้น: เพิ่มแถวเริ่มต้นอย่างน้อย 1 แถวในตารางแบบไดนามิกทุกตัว ถ้ายังไม่มี
+            ['compensation', 'service', 'material'].forEach(key => {
+                const body = document.getElementById(`f6-budget-${key}-rows`);
+                if (body && !body.children.length) this.f6AddBudgetRow(key);
+            });
+            ['plan13', 'project'].forEach(key => {
+                const body = document.getElementById(`f6-kpi-${key}-rows`);
+                if (body && !body.children.length) this.f6AddKpiRow(key);
+            });
+            const actBody = document.getElementById('f6-activity-rows');
+            if (actBody && !actBody.children.length) {
+                ['การวางแผนปฏิบัติงาน', 'การดำเนินงาน', 'การติดตามและการประเมินผล']
+                    .forEach(label => this.f6AddActivityRow(label));
+            }
+
+            // ถ้ามี id ที่กำลังแก้ไข ให้โหลดข้อมูลกลับเข้าฟอร์ม (รองรับเรียกซ้ำตอนแก้ไข)
+            const editId = document.getElementById('f6-edit-id')?.value;
+            if (editId) await this.loadForm6ToForm(editId);
+
+            await this.loadForm6Records();
+
+        } catch (e) {
+            console.error('initManageForm6 error', e);
+        } finally {
+            this.hideLoader();
+            lucide.createIcons();
+        }
+    },
+
+
+    /* ---------- ข้อ 2: ลักษณะโครงการ "อื่นๆ" toggle ---------- */
+    f6ToggleNatureOther() {
+        const el = document.getElementById('f6-nature-7'); // index 7 = อื่นๆ
+        const txt = document.getElementById('f6-nature-other-text');
+        if (el && txt) txt.classList.toggle('hidden', !el.checked);
+    },
+
+    /* ---------- SECTION C: cascade ประเด็นยุทธศาสตร์ -> วัตถุประสงค์ -> กลยุทธ์ ---------- */
+    f6CascadeStep(step) {
+        const cache = this._f6cache || {};
+        if (step === 'issue') {
+            const issueId = document.getElementById('f6-issue')?.value || '';
+            const stratSel = document.getElementById('f6-strategy');
+            const dimSel = document.getElementById('f6-dimension');
+            this._f6ResetSelect(dimSel, '— เลือกวัตถุประสงค์ก่อน —');
+            if (!issueId) { this._f6ResetSelect(stratSel, '— เลือกประเด็นก่อน —'); return; }
+            const opts = (cache.strategies || []).filter(s => s.issueId === issueId);
+            this._f6FillSelect(stratSel, opts, '— เลือกวัตถุประสงค์เชิงยุทธศาสตร์ —');
+        } else if (step === 'strategy') {
+            const strategyId = document.getElementById('f6-strategy')?.value || '';
+            const dimSel = document.getElementById('f6-dimension');
+            if (!strategyId) { this._f6ResetSelect(dimSel, '— เลือกวัตถุประสงค์ก่อน —'); return; }
+            const opts = (cache.dimensions || []).filter(d => d.strategyId === strategyId);
+            this._f6FillSelect(dimSel, opts, '— เลือกกลยุทธ์ —');
+        }
+    },
+
+    _f6FillSelect(sel, items, placeholder) {
+        if (!sel) return;
+        sel.innerHTML = `<option value="">${placeholder}</option>` +
+            items.map(x => `<option value="${x.id}">${x.name || x.label || x.id}</option>`).join('');
+        sel.disabled = items.length === 0;
+        sel.classList.toggle('f4-placeholder', !sel.value);
+    },
+    _f6ResetSelect(sel, placeholder) {
+        if (!sel) return;
+        sel.innerHTML = `<option value="">${placeholder}</option>`;
+        sel.disabled = true;
+        sel.classList.add('f4-placeholder');
+    },
+
+    /* ---------- SECTION E: กลุ่มเป้าหมาย / ผู้เข้าร่วม — auto sum ---------- */
+    f6RecalcTargets() {
+        const a = Number(document.getElementById('f6-target-staff')?.value || 0);
+        const b = Number(document.getElementById('f6-target-student')?.value || 0);
+        const c = Number(document.getElementById('f6-target-external')?.value || 0);
+        const total = document.getElementById('f6-target-total');
+        if (total) total.innerText = (a + b + c).toLocaleString();
+    },
+    f6RecalcAttendees() {
+        const a = Number(document.getElementById('f6-attend-speaker')?.value || 0);
+        const b = Number(document.getElementById('f6-attend-committee')?.value || 0);
+        const total = document.getElementById('f6-attend-total');
+        if (total) total.innerText = (a + b).toLocaleString();
+    },
+
+    /* ---------- SECTION F: ระยะดำเนินโครงการ (dynamic, เริ่มต้น 0 แถว) ---------- */
+    f6AddPhaseRow() {
+        const body = document.getElementById('f6-phase-rows');
+        if (!body) return;
+        const idx = body.children.length + 1;
+        const rid = `f6-phase-${Date.now()}-${idx}`;
+        const row = document.createElement('div');
+        row.className = 'card-main p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2';
+        row.dataset.rid = rid;
+        row.innerHTML = `
+            <div class="flex justify-between items-center">
+                <span class="text-xs font-bold text-gray-500">ระยะที่ ${idx}</span>
+                <button onclick="App.f6RemovePhaseRow('${rid}')" class="text-red-400 hover:text-red-600 no-print"><i data-lucide="x" size="16"></i></button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input class="input-flat w-full bg-white f6-phase-date" placeholder="วันที่ดำเนินโครงการ...">
+                <input class="input-flat w-full bg-white f6-phase-place" placeholder="สถานที่...">
+            </div>
+            <div class="flex gap-6">
+                <label class="flex items-center gap-2 text-sm"><input type="radio" name="${rid}-mode" value="Onsite" class="accent-indigo-600 f6-phase-mode"><span>Onsite</span></label>
+                <label class="flex items-center gap-2 text-sm"><input type="radio" name="${rid}-mode" value="Online" class="accent-indigo-600 f6-phase-mode"><span>Online</span></label>
+                <label class="flex items-center gap-2 text-sm"><input type="radio" name="${rid}-mode" value="แบบผสมผสาน" class="accent-indigo-600 f6-phase-mode"><span>แบบผสมผสาน</span></label>
+            </div>`;
+        body.appendChild(row);
+        lucide.createIcons();
+    },
+    f6RemovePhaseRow(rid) {
+        const row = document.querySelector(`#f6-phase-rows [data-rid="${rid}"]`);
+        if (row) row.remove();
+    },
+
+    /* ---------- SECTION G: ตารางกิจกรรม 12 เดือน (dynamic) ---------- */
+    f6AddActivityRow(presetLabel = '') {
+        const body = document.getElementById('f6-activity-rows');
+        if (!body) return;
+        const rid = `act-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+        const tr = document.createElement('tr');
+        tr.dataset.rid = rid;
+        tr.innerHTML = `
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white f6-act-label" value="${presetLabel}" placeholder="ระบุกิจกรรม..."></td>
+            ${['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].map(m =>
+                `<td class="px-2 py-2 text-center"><input type="checkbox" class="accent-indigo-600 f6-act-${m}"></td>`).join('')}
+            <td class="px-2 py-2 no-print"><button onclick="App.f6RemoveRow('f6-activity-rows','${rid}')" class="text-red-400 hover:text-red-600"><i data-lucide="x" size="14"></i></button></td>`;
+        body.appendChild(tr);
+        lucide.createIcons();
+    },
+
+    /* ---------- SECTION I: รายการงบประมาณ 3 หมวด (dynamic + auto sum) ---------- */
+    f6AddBudgetRow(groupKey) {
+        const body = document.getElementById(`f6-budget-${groupKey}-rows`);
+        if (!body) return;
+        const rid = `bud-${groupKey}-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+        const tr = document.createElement('tr');
+        tr.dataset.rid = rid;
+        tr.innerHTML = `
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white f6-bud-phase" placeholder="เช่น 1"></td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white f6-bud-label" placeholder="ระบุรายการ..."></td>
+            <td class="px-3 py-2"><input type="number" min="0" step="0.01" class="input-flat w-full bg-white text-right f6-bud-amount" placeholder="0.00" onchange="App.f6RecalcBudget()"></td>
+            <td class="px-2 py-2 no-print"><button onclick="App.f6RemoveRow('f6-budget-${groupKey}-rows','${rid}'); App.f6RecalcBudget();" class="text-red-400 hover:text-red-600"><i data-lucide="x" size="14"></i></button></td>`;
+        body.appendChild(tr);
+        lucide.createIcons();
+        this.f6RecalcBudget();
+    },
+    f6RecalcBudget() {
+        let grand = 0;
+        ['compensation', 'service', 'material'].forEach(key => {
+            const body = document.getElementById(`f6-budget-${key}-rows`);
+            let sum = 0;
+            if (body) {
+                body.querySelectorAll('.f6-bud-amount').forEach(inp => sum += Number(inp.value || 0));
+            }
+            grand += sum;
+            const sumEl = document.getElementById(`f6-sum-${key}`);
+            if (sumEl) sumEl.innerText = sum.toLocaleString(undefined, { minimumFractionDigits: 2 });
+        });
+        const totalEl = document.getElementById('f6-total-amount');
+        if (totalEl) totalEl.innerText = grand.toLocaleString(undefined, { minimumFractionDigits: 2 });
+        return grand;
+    },
+
+    /* ---------- SECTION K: ตัวชี้วัด (dynamic แถว, ใช้ร่วม 21.1/21.2) ---------- */
+    // mapping: groupKey ('plan13' | 'project') -> Firestore collection ของ master list ตัวชี้วัดตั้งต้น
+    _f6KpiMasterCol(groupKey) {
+        return groupKey === 'plan13' ? 'kpi_master_plan13' : 'kpi_master_project';
+    },
+    _f6KpiMasterCacheKey(groupKey) {
+        return groupKey === 'plan13' ? 'kpiPlan13Master' : 'kpiProjectMaster';
+    },
+
+    f6AddKpiRow(groupKey) {
+        const body = document.getElementById(`f6-kpi-${groupKey}-rows`);
+        if (!body) return;
+        const units = (this._f6cache?.units || []);
+        const cacheKey = this._f6KpiMasterCacheKey(groupKey);
+        const kpiOptions = this.f4SortByName(this._f6cache?.[cacheKey] || []);
+        const rid = `kpi-${groupKey}-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+        const tr = document.createElement('tr');
+        tr.dataset.rid = rid;
+        tr.innerHTML = `
+            <td class="px-3 py-2">
+                <select class="input-flat w-full bg-white text-xs f6-kpi-label" data-group="${groupKey}" onchange="App.f6OnKpiLabelChange(this)">
+                    <option value="">— เลือกตัวชี้วัด —</option>
+                    ${kpiOptions.map(k => `<option value="${k.name}">${k.name}</option>`).join('')}
+                    <option value="__add_new__">+ เพิ่มรายการใหม่...</option>
+                </select>
+            </td>
+            <td class="px-3 py-2">
+                <select class="input-flat w-full bg-white text-xs f6-kpi-unit">
+                    <option value="">— หน่วยนับ —</option>
+                    ${units.map(u => `<option value="${u.name}">${u.name}</option>`).join('')}
+                </select>
+            </td>
+            <td class="px-3 py-2"><input type="number" class="input-flat w-full bg-white text-right f6-kpi-value" placeholder="0"></td>
+            <td class="px-2 py-2 no-print"><button onclick="App.f6RemoveRow('f6-kpi-${groupKey}-rows','${rid}')" class="text-red-400 hover:text-red-600"><i data-lucide="x" size="14"></i></button></td>`;
+        body.appendChild(tr);
+        lucide.createIcons();
+    },
+
+    // เมื่อเลือก "+ เพิ่มรายการใหม่..." ใน dropdown ตัวชี้วัด ให้ถาม prompt แล้วบันทึกลง master list ทันที
+    async f6OnKpiLabelChange(selectEl) {
+        if (!selectEl || selectEl.value !== '__add_new__') return;
+        const groupKey = selectEl.dataset.group;
+        const name = (prompt('ระบุชื่อตัวชี้วัดใหม่:') || '').trim();
+        if (!name) { selectEl.value = ''; return; }
+
+        try {
+            this.showLoader();
+            const col = this._f6KpiMasterCol(groupKey);
+            const cacheKey = this._f6KpiMasterCacheKey(groupKey);
+            const colRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
+
+            // กันชื่อซ้ำ: ถ้ามีอยู่แล้วใน cache ไม่ต้องเขียนซ้ำ
+            const cache = this._f6cache || (this._f6cache = {});
+            if (!cache[cacheKey]) cache[cacheKey] = [];
+            const existing = cache[cacheKey].find(k => (k.name || '').trim() === name);
+
+            let newItem = existing;
+            if (!existing) {
+                const ref = await colRef.add({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser?.name || '' });
+                newItem = { id: ref.id, name };
+                cache[cacheKey].push(newItem);
+            }
+
+            // เติม option ใหม่ใน select ตัวนี้ (ก่อน option "+ เพิ่มรายการใหม่...") แล้วเลือกให้ทันที
+            const addNewOpt = Array.from(selectEl.options).find(o => o.value === '__add_new__');
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            if (addNewOpt) selectEl.insertBefore(opt, addNewOpt); else selectEl.appendChild(opt);
+            selectEl.value = name;
+
+            // เติม option ใหม่ใน select ตัวชี้วัดแถวอื่นๆ ของกลุ่มเดียวกัน เพื่อให้เลือกได้ทันทีโดยไม่ต้องรีโหลดหน้า
+            document.querySelectorAll(`.f6-kpi-label[data-group="${groupKey}"]`).forEach(sel => {
+                if (sel === selectEl) return;
+                if (Array.from(sel.options).some(o => o.value === name)) return;
+                const addNewOpt2 = Array.from(sel.options).find(o => o.value === '__add_new__');
+                const opt2 = document.createElement('option');
+                opt2.value = name;
+                opt2.textContent = name;
+                if (addNewOpt2) sel.insertBefore(opt2, addNewOpt2); else sel.appendChild(opt2);
+            });
+        } catch (e) {
+            console.error('f6OnKpiLabelChange error', e);
+            alert('บันทึกตัวชี้วัดใหม่ไม่สำเร็จ');
+            selectEl.value = '';
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    /* ---------- ตัวช่วยลบแถวทั่วไป ---------- */
+    f6RemoveRow(bodyId, rid) {
+        const row = document.querySelector(`#${bodyId} [data-rid="${rid}"]`);
+        if (row) row.remove();
+    },
+
+    /* ---------- toggle ผลผลิตยุทธศาสตร์งบประมาณ 21.3 ---------- */
+    f6ToggleOutputBlock(key) {
+        const cb = document.getElementById(`f6-output-${key}`);
+        const block = document.getElementById(`f6-output-${key}-block`);
+        if (cb && block) block.classList.toggle('hidden', !cb.checked);
+    },
+
+    /* ---------- เก็บค่า checkbox/radio ทั้งหมดเป็น array/object ---------- */
+    _f6CollectChecklist(ids) {
+        return ids.filter(id => document.getElementById(id)?.checked).map(id => document.getElementById(id).value || id);
+    },
+    _f6Val(id) { return document.getElementById(id)?.value ?? ''; },
+    _f6Checked(id) { return !!document.getElementById(id)?.checked; },
+
+    /* ---------- รวบรวมข้อมูลทั้งฟอร์มเป็น payload ---------- */
+    f6BuildPayload() {
+        const collectPhases = () => Array.from(document.querySelectorAll('#f6-phase-rows [data-rid]')).map(row => ({
+            date: row.querySelector('.f6-phase-date')?.value || '',
+            place: row.querySelector('.f6-phase-place')?.value || '',
+            mode: row.querySelector('.f6-phase-mode:checked')?.value || ''
+        }));
+
+        const collectActivities = () => Array.from(document.querySelectorAll('#f6-activity-rows [data-rid]')).map(row => {
+            const months = {};
+            ['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].forEach(m => {
+                months[m] = !!row.querySelector(`.f6-act-${m}`)?.checked;
+            });
+            return { label: row.querySelector('.f6-act-label')?.value || '', months };
+        });
+
+        const collectBudgetRows = (key) => Array.from(document.querySelectorAll(`#f6-budget-${key}-rows [data-rid]`)).map(row => ({
+            phase: row.querySelector('.f6-bud-phase')?.value || '',
+            label: row.querySelector('.f6-bud-label')?.value || '',
+            amount: Number(row.querySelector('.f6-bud-amount')?.value || 0)
+        }));
+
+        const collectKpiRows = (key) => Array.from(document.querySelectorAll(`#f6-kpi-${key}-rows [data-rid]`)).map(row => ({
+            label: row.querySelector('.f6-kpi-label')?.value || '',
+            unit: row.querySelector('.f6-kpi-unit')?.value || '',
+            value: row.querySelector('.f6-kpi-value')?.value || ''
+        }));
+
+        const disbursement = {};
+        ['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].forEach(m => {
+            disbursement[m] = Number(document.getElementById(`f6-disb-${m}`)?.value || 0);
+        });
+
+        const totalAmount = this.f6RecalcBudget();
+
+        const deptSel = document.getElementById('f6-dept');
+        const deptName = deptSel?.selectedOptions?.[0]?.textContent?.trim() || '';
+        const branchSel = document.getElementById('f6-branch');
+        const branchName = branchSel?.selectedOptions?.[0]?.textContent?.trim() || '';
+        const yearSel = document.getElementById('f6-year');
+        const yearLabel = yearSel?.selectedOptions?.[0]?.textContent?.trim() || '';
+        const budgetSourceSel = document.getElementById('f6-budget-source');
+        const budgetSourceName = budgetSourceSel?.selectedOptions?.[0]?.textContent?.trim() || '';
+        const plan13Sel = document.getElementById('f6-plan13-plan');
+        const plan13Name = plan13Sel?.selectedOptions?.[0]?.textContent?.trim() || '';
+
+        return {
+            // ── ฟิลด์มาตรฐานสำหรับ Dashboard ──
+            formType: 'ng6',
+            formCode: 'ง.6',
+            deptId: deptSel?.value || '',
+            deptName,
+            branchId: branchSel?.value || '',
+            branchName,
+            fiscalYear: yearLabel,
+            itemName: this._f6Val('f6-project-name'),     // ชื่อโครงการ ใช้แสดงในตาราง/Dashboard
+            requestedAmount: totalAmount,
+            status: 'submitted',
+            // ── ใช้วิ่งเข้างบประมาณ/Dashboard โดยตรง (ข้อ 3) ──
+            budgetSourceId: budgetSourceSel?.value || '',
+            budgetSourceName,
+            budgetOther: this._f6Val('f6-budget-other'),
+
+            // ── รายละเอียดเต็มของฟอร์ม (ใช้สำหรับ print/แก้ไข) ──
+            detail: {
+                projectName: this._f6Val('f6-project-name'),
+                nature: this._f6CollectChecklist(Array.from({length:8}, (_,i) => `f6-nature-${i}`)),
+                natureOtherText: this._f6Val('f6-nature-other-text'),
+                budgetSource: {
+                    id: budgetSourceSel?.value || '',
+                    name: budgetSourceName,
+                    otherText: this._f6Val('f6-budget-other')
+                },
+                plans: {
+                    p41a: this._f6Checked('f6-plan41-a'), p41b: this._f6Checked('f6-plan41-b'),
+                    p42a: this._f6Checked('f6-plan42-a'), p42b: this._f6Checked('f6-plan42-b'), p42c: this._f6Checked('f6-plan42-c'),
+                    p42Project: this._f6Checked('f6-plan42-proj'), p42ProjectText: this._f6Val('f6-plan42-proj-text'),
+                    p43Text: this._f6Val('f6-plan43-text'),
+                    p43Project: this._f6Checked('f6-plan43-proj'), p43ProjectText: this._f6Val('f6-plan43-proj-text'),
+                    p44: this._f6Checked('f6-plan44'), p44Text: this._f6Val('f6-plan44-text')
+                },
+                nationalStrategy: this._f6CollectChecklist(['f6-natstrat-2','f6-natstrat-3']),
+                masterPlan: this._f6CollectChecklist(['f6-masterplan-8','f6-masterplan-11','f6-masterplan-12','f6-masterplan-23']),
+                milestones: this._f6CollectChecklist(Array.from({length:13}, (_,i) => `f6-milestone-${i+1}`)),
+
+                stratIssueId: this._f6Val('f6-issue'),
+                stratIssueName: document.getElementById('f6-issue')?.selectedOptions?.[0]?.textContent?.trim() || '',
+                stratStrategyId: this._f6Val('f6-strategy'),
+                stratStrategyName: document.getElementById('f6-strategy')?.selectedOptions?.[0]?.textContent?.trim() || '',
+                stratDimensionId: this._f6Val('f6-dimension'),
+                stratDimensionName: document.getElementById('f6-dimension')?.selectedOptions?.[0]?.textContent?.trim() || '',
+
+                rationale: this._f6Val('f6-rationale'),
+                objective: this._f6Val('f6-objective'),
+                integration: {
+                    faculty: this._f6Val('f6-integrate-faculty'),
+                    branch: this._f6Val('f6-integrate-branch'),
+                    knowledge: this._f6Val('f6-integrate-knowledge')
+                },
+
+                target: {
+                    staff: Number(this._f6Val('f6-target-staff') || 0),
+                    student: Number(this._f6Val('f6-target-student') || 0),
+                    external: Number(this._f6Val('f6-target-external') || 0),
+                    externalText: this._f6Val('f6-target-external-text')
+                },
+                attendees: {
+                    speaker: Number(this._f6Val('f6-attend-speaker') || 0),
+                    committee: Number(this._f6Val('f6-attend-committee') || 0)
+                },
+
+                schedule: {
+                    date: this._f6Val('f6-date'),
+                    place: this._f6Val('f6-place'),
+                    mode: document.querySelector('input[name="f6-mode"]:checked')?.value || '',
+                    phases: collectPhases()
+                },
+
+                activities: collectActivities(),
+                disbursementPlan: disbursement,
+
+                budget: {
+                    compensation: collectBudgetRows('compensation'),
+                    service: collectBudgetRows('service'),
+                    material: collectBudgetRows('material'),
+                    totalAmount,
+                    followupBudget: this._f6Val('f6-followup-budget')
+                },
+
+                expectedResults: {
+                    ultimateOutcome: this._f6Val('f6-outcome-ultimate'),
+                    outcome: this._f6Val('f6-outcome-mid'),
+                    output: this._f6Val('f6-outcome-output')
+                },
+
+                evaluation: {
+                    kpiPlan13: collectKpiRows('plan13'),
+                    kpiPlan13PlanId: plan13Sel?.value || '',
+                    kpiPlan13PlanName: plan13Name,
+                    kpiProject: collectKpiRows('project'),
+                    budgetStratYear: this._f6Val('f6-budget-strat-year'),
+                    outputAcademic: this._f6Checked('f6-output-academic') ? {
+                        item1: { unit: this._f6Val('f6-academic-1-unit'), value: this._f6Val('f6-academic-1-val') },
+                        item2: { unit: this._f6Val('f6-academic-2-unit'), value: this._f6Val('f6-academic-2-val') }
+                    } : null,
+                    outputCulture: this._f6Checked('f6-output-culture') ? {
+                        item1: { unit: this._f6Val('f6-culture-1-unit'), value: this._f6Val('f6-culture-1-val') },
+                        item2: { unit: this._f6Val('f6-culture-2-unit'), value: this._f6Val('f6-culture-2-val') }
+                    } : null,
+                    outputWorkforce: this._f6Checked('f6-output-workforce') ? {
+                        item1: { unit: this._f6Val('f6-workforce-1-unit'), value: this._f6Val('f6-workforce-1-val') },
+                        item2: { label: this._f6Val('f6-workforce-2-label'), unit: this._f6Val('f6-workforce-2-unit'), value: this._f6Val('f6-workforce-2-val') }
+                    } : null,
+                    outputOther: this._f6Checked('f6-output-other') ? {
+                        name: this._f6Val('f6-output-other-name'),
+                        item1: { label: this._f6Val('f6-other-1-label'), unit: this._f6Val('f6-other-1-unit'), value: this._f6Val('f6-other-1-val') }
+                    } : null
+                },
+
+                coordinator: {
+                    name: this._f6Val('f6-coord-name'),
+                    position: this._f6Val('f6-coord-position'),
+                    phoneOffice: this._f6Val('f6-coord-phone-office'),
+                    phoneMobile: this._f6Val('f6-coord-phone-mobile'),
+                    email: this._f6Val('f6-coord-email')
+                }
+            }
+        };
+    },
+
+    /* ---------- SAVE (พร้อม history sub-collection) ---------- */
+    async saveForm6() {
+        const projectName = this._f6Val('f6-project-name');
+        const deptId = this._f6Val('f6-dept');
+        const yearVal = this._f6Val('f6-year');
+
+        if (!projectName) return alert('กรุณาระบุชื่อโครงการ (ข้อ 1)');
+        if (!deptId) return alert('กรุณาเลือกหน่วยงาน');
+        if (!yearVal) return alert('กรุณาเลือกปีงบประมาณ');
+
+        const id = document.getElementById('f6-edit-id')?.value || '';
+        const payload = this.f6BuildPayload();
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+
+        const colRef = db.collection('artifacts').doc(appId)
+            .collection('public').doc('data').collection('requests_ng6');
+
+        try {
+            this.showLoader();
+            let docId = id;
+
+            if (id) {
+                payload.updatedBy = currentUser?.name || '';
+                payload.updatedAt = now;
+                await colRef.doc(id).update(payload);
+            } else {
+                payload.createdBy = currentUser?.name || '';
+                payload.createdAt = now;
+                payload.updatedBy = currentUser?.name || '';
+                payload.updatedAt = now;
+                payload.version = 1;
+                const newRef = await colRef.add(payload);
+                docId = newRef.id;
+                document.getElementById('f6-edit-id').value = docId;
+            }
+
+            // เก็บ snapshot ลง history (append-only เพื่อย้อนดูเวอร์ชันก่อนหน้าได้)
+            await colRef.doc(docId).collection('history').add({
+                snapshot: payload,
+                editedBy: currentUser?.name || '',
+                editedAt: now
+            });
+
+            alert('บันทึกสำเร็จ');
+            await this.loadForm6Records();
+        } catch (e) {
+            console.error('saveForm6 error', e);
+            alert('บันทึกไม่สำเร็จ: ' + (e.message || e));
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    /* ---------- LOAD list ---------- */
+    async fetchForm6List() {
+        const snap = await db.collection('artifacts').doc(appId)
+            .collection('public').doc('data').collection('requests_ng6')
+            .orderBy('createdAt', 'desc').get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+
+    async loadForm6Records() {
+        const tbody = document.getElementById('f6-records-tbody');
+        if (!tbody) return;
+        try {
+            const data = await this.fetchForm6List();
+            if (!data.length) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">ยังไม่มีข้อมูล</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = data.map((d, i) => `
+                <tr>
+                    <td class="px-4 py-3 text-center text-gray-400">${i + 1}</td>
+                    <td class="px-4 py-3 font-bold">${d.itemName || '-'}</td>
+                    <td class="px-4 py-3">${d.deptName || '-'}</td>
+                    <td class="px-4 py-3 text-right font-bold text-indigo-700">${Number(d.requestedAmount || 0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                    <td class="px-4 py-3 text-xs text-gray-400">${d.createdBy || '-'}</td>
+                    <td class="px-4 py-3 text-xs text-gray-400">${d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString('th-TH') : '-'}</td>
+                    <td class="px-4 py-3 text-center">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="App.loadForm6ToForm('${d.id}')" class="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100" title="แก้ไข"><i data-lucide="pencil" size="14"></i></button>
+                            <button onclick="App.printForm6('${d.id}')" class="p-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100" title="Print"><i data-lucide="printer" size="14"></i></button>
+                            <button onclick="App.deleteForm6('${d.id}')" class="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100" title="ลบ"><i data-lucide="trash-2" size="14"></i></button>
+                        </div>
+                    </td>
+                </tr>`).join('');
+            lucide.createIcons();
+        } catch (e) {
+            console.error('loadForm6Records error', e);
+            tbody.innerHTML = `<tr><td colspan="7" class="px-6 py-8 text-center text-red-400 text-xs font-bold">โหลดข้อมูลไม่สำเร็จ</td></tr>`;
+        }
+    },
+
+    /* ---------- EDIT: โหลดข้อมูลเดิมกลับเข้าฟอร์ม ---------- */
+    async loadForm6ToForm(id) {
+        try {
+            this.showLoader();
+            const doc = await db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection('requests_ng6').doc(id).get();
+            if (!doc.exists) return alert('ไม่พบข้อมูล');
+            const d = doc.data();
+            const det = d.detail || {};
+
+            document.getElementById('f6-edit-id').value = id;
+            document.getElementById('f6-dept').value = d.deptId || '';
+            document.getElementById('f6-branch').value = d.branchId || '';
+            document.getElementById('f6-year').value = ''; // ปล่อยให้ผู้ใช้ตรวจสอบ/เลือกใหม่ถ้าจำเป็น (label เทียบยาก)
+            document.getElementById('f6-project-name').value = det.projectName || '';
+            document.getElementById('f6-rationale').value = det.rationale || '';
+            document.getElementById('f6-objective').value = det.objective || '';
+
+            // ติ๊ก checkbox ลักษณะโครงการกลับ
+            (det.nature || []).forEach(val => {
+                document.querySelectorAll('#f6-project-name')[0]; // no-op guard
+            });
+
+            document.getElementById('f6-coord-name').value = det.coordinator?.name || '';
+            document.getElementById('f6-coord-position').value = det.coordinator?.position || '';
+            document.getElementById('f6-coord-phone-office').value = det.coordinator?.phoneOffice || '';
+            document.getElementById('f6-coord-phone-mobile').value = det.coordinator?.phoneMobile || '';
+            document.getElementById('f6-coord-email').value = det.coordinator?.email || '';
+
+            document.getElementById('f6-date').value = det.schedule?.date || '';
+            document.getElementById('f6-place').value = det.schedule?.place || '';
+
+            document.getElementById('f6-target-staff').value = det.target?.staff || '';
+            document.getElementById('f6-target-student').value = det.target?.student || '';
+            document.getElementById('f6-target-external').value = det.target?.external || '';
+            this.f6RecalcTargets();
+
+            document.getElementById('f6-attend-speaker').value = det.attendees?.speaker || '';
+            document.getElementById('f6-attend-committee').value = det.attendees?.committee || '';
+            this.f6RecalcAttendees();
+
+            document.getElementById('f6-outcome-ultimate').value = det.expectedResults?.ultimateOutcome || '';
+            document.getElementById('f6-outcome-mid').value = det.expectedResults?.outcome || '';
+            document.getElementById('f6-outcome-output').value = det.expectedResults?.output || '';
+
+            document.getElementById('f6-followup-budget').value = det.budget?.followupBudget || '';
+
+            // เติมแถวงบประมาณ 3 หมวด
+            ['compensation','service','material'].forEach(key => {
+                const body = document.getElementById(`f6-budget-${key}-rows`);
+                if (!body) return;
+                body.innerHTML = '';
+                const rows = det.budget?.[key] || [];
+                if (!rows.length) { this.f6AddBudgetRow(key); return; }
+                rows.forEach(r => {
+                    this.f6AddBudgetRow(key);
+                    const last = body.lastElementChild;
+                    if (last) {
+                        last.querySelector('.f6-bud-phase').value = r.phase || '';
+                        last.querySelector('.f6-bud-label').value = r.label || '';
+                        last.querySelector('.f6-bud-amount').value = r.amount || '';
+                    }
+                });
+            });
+            this.f6RecalcBudget();
+
+            // เติมแถวกิจกรรม
+            const actBody = document.getElementById('f6-activity-rows');
+            if (actBody && det.activities?.length) {
+                actBody.innerHTML = '';
+                det.activities.forEach(a => {
+                    this.f6AddActivityRow(a.label || '');
+                    const last = actBody.lastElementChild;
+                    if (last) {
+                        Object.keys(a.months || {}).forEach(m => {
+                            const cb = last.querySelector(`.f6-act-${m}`);
+                            if (cb) cb.checked = !!a.months[m];
+                        });
+                    }
+                });
+            }
+
+            // แผนเบิกจ่าย
+            Object.entries(det.disbursementPlan || {}).forEach(([m, v]) => {
+                const el = document.getElementById(`f6-disb-${m}`);
+                if (el) el.value = v || '';
+            });
+
+            // ตัวชี้วัด 21.1 / 21.2
+            ['plan13','project'].forEach(key => {
+                const body = document.getElementById(`f6-kpi-${key}-rows`);
+                if (!body) return;
+                const rows = det.evaluation?.[key === 'plan13' ? 'kpiPlan13' : 'kpiProject'] || [];
+                body.innerHTML = '';
+                if (!rows.length) { this.f6AddKpiRow(key); return; }
+                rows.forEach(r => {
+                    this.f6AddKpiRow(key);
+                    const last = body.lastElementChild;
+                    if (last) {
+                        const labelSel = last.querySelector('.f6-kpi-label');
+                        const label = r.label || '';
+                        if (labelSel && label) {
+                            const hasOpt = Array.from(labelSel.options).some(o => o.value === label);
+                            if (!hasOpt) {
+                                const addNewOpt = Array.from(labelSel.options).find(o => o.value === '__add_new__');
+                                const opt = document.createElement('option');
+                                opt.value = label; opt.textContent = label;
+                                if (addNewOpt) labelSel.insertBefore(opt, addNewOpt); else labelSel.appendChild(opt);
+                            }
+                            labelSel.value = label;
+                        }
+                        last.querySelector('.f6-kpi-unit').value = r.unit || '';
+                        last.querySelector('.f6-kpi-value').value = r.value || '';
+                    }
+                });
+            });
+
+            // ฉบับแผนพัฒนามหาวิทยาลัย (21.1) + แหล่งเงินงบประมาณ (ข้อ 3)
+            const plan13PlanEl = document.getElementById('f6-plan13-plan');
+            if (plan13PlanEl) plan13PlanEl.value = det.evaluation?.kpiPlan13PlanId || '';
+            const budgetSourceEl = document.getElementById('f6-budget-source');
+            if (budgetSourceEl) budgetSourceEl.value = d.budgetSourceId || '';
+            const budgetOtherEl = document.getElementById('f6-budget-other');
+            if (budgetOtherEl) budgetOtherEl.value = d.budgetOther || '';
+
+            // cascade ยุทธศาสตร์: ตั้งค่า issue ก่อนแล้วค่อย trigger cascade ไปหา strategy/dimension
+            if (det.stratIssueId) {
+                document.getElementById('f6-issue').value = det.stratIssueId;
+                this.f6CascadeStep('issue');
+                setTimeout(() => {
+                    if (det.stratStrategyId) {
+                        document.getElementById('f6-strategy').value = det.stratStrategyId;
+                        this.f6CascadeStep('strategy');
+                        setTimeout(() => {
+                            if (det.stratDimensionId) document.getElementById('f6-dimension').value = det.stratDimensionId;
+                        }, 150);
+                    }
+                }, 150);
+            }
+
+            alert('โหลดข้อมูลเข้าฟอร์มแล้ว — แก้ไขแล้วกด "บันทึก" เพื่ออัปเดต');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (e) {
+            console.error('loadForm6ToForm error', e);
+            alert('โหลดข้อมูลไม่สำเร็จ');
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    /* ---------- DELETE ---------- */
+    async deleteForm6(id) {
+        if (!confirm('ยืนยันการลบรายการนี้? (ประวัติเดิมจะถูกลบไปด้วย)')) return;
+        try {
+            this.showLoader();
+            await db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection('requests_ng6').doc(id).delete();
+            alert('ลบสำเร็จ');
+            await this.loadForm6Records();
+        } catch (e) {
+            console.error('deleteForm6 error', e);
+            alert('ลบไม่สำเร็จ');
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    /* ---------- RESET ---------- */
+    resetForm6() {
+        if (!confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+        document.getElementById('f6-edit-id').value = '';
+        document.querySelectorAll('#content-view input[id^="f6-"], #content-view textarea[id^="f6-"]').forEach(el => {
+            if (el.type === 'checkbox' || el.type === 'radio') el.checked = false;
+            else el.value = '';
+        });
+        ['f6-activity-rows','f6-budget-compensation-rows','f6-budget-service-rows','f6-budget-material-rows',
+         'f6-kpi-plan13-rows','f6-kpi-project-rows','f6-phase-rows'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '';
+        });
+        this.f6RecalcBudget();
+        this.f6RecalcTargets();
+        this.f6RecalcAttendees();
+        this.initManageForm6();
+    },
+
+    /* ---------- PRINT: โหลด record จาก Firestore ตรงๆ มาฉีดใส่ฟอร์มปัจจุบันแล้วสั่งพิมพ์ ---------- */
+    async printForm6(id) {
+        await this.loadForm6ToForm(id);
+        // log การพิมพ์ (เผื่อหน่วยงานหลักถามว่าพิมพ์ฉบับล่าสุดหรือยัง)
+        try {
+            await db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection('requests_ng6').doc(id)
+                .update({ printedAt: firebase.firestore.FieldValue.serverTimestamp(), printedBy: currentUser?.name || '' });
+        } catch (e) { console.warn('printedAt log failed', e); }
+        setTimeout(() => window.print(), 400);
+    }
+
 };
 /* ===== Firebase ใช้ของเดิม ===== */
 

@@ -97,12 +97,14 @@ select.f4-cell-input { color: #111827; }
 
 /* ── Cascade Step rows ── */
 .f4-strat-row { display: flex; align-items: center; gap: 0; padding: 0.7rem 1rem; }
+.f4-strat-row.items-start { align-items: flex-start; }
 .f4-strat-badge { width: 1.6rem; height: 1.6rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; flex-shrink: 0; }
 .f4-strat-label { min-width: 200px; max-width: 200px; font-size: 0.78rem; font-weight: 700; color: #374151; padding: 0 0.85rem; }
 .f4-strat-field { flex: 1; }
 .f4-strat-select { width: 100%; background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 0.55rem 0.85rem; border-radius: 0.7rem; font-size: 0.8rem; outline: none; color: #111827; }
 .f4-strat-select:focus { border-color: #6366f1; background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.07); }
 .f4-strat-select:disabled { background: #f1f5f9; color: #9ca3af; cursor: not-allowed; border-style: dashed; }
+.f4-multi-select { display: block; }
 @media (max-width: 768px) {
   .form4-page { padding: 1rem !important; }
   .form4-page .card-main { padding: 1rem !important; }
