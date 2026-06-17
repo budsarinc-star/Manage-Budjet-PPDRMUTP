@@ -67,132 +67,199 @@ const UI = {
 
     manageForm4Template() {
         return `<div class="card-main p-12 bg-white relative print:p-0 print:shadow-none form4-page">
+            <!-- Print-only form code (top-right on paper) -->
+            <div class="print-only form4-print-code">แบบ ง.4</div>
+
             <div class="flex flex-col md:flex-row justify-between items-start gap-4 mb-10 no-print">
                 <div>
                     <h3 class="text-indigo-900 font-black text-2xl">(ง.4) รายละเอียดคำชี้แจงรายการครุภัณฑ์</h3>
                     <p class="text-[11px] text-gray-400 font-bold mt-1">ข้อมูล <span class="text-red-500">*</span> สีแดง คือบังคับกรอกข้อมูล</p>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 items-center">
                     <input type="hidden" id="f4-edit-id">
-                    <button onclick="App.saveForm4()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2 text-xs">
-                        <i data-lucide="save" size="16"></i> บันทึก
-                    </button>
-                    <button onclick="App.resetForm4()" class="bg-white text-gray-500 px-5 py-3 rounded-xl font-bold shadow-sm border border-indigo-100 flex items-center gap-2 text-xs hover:bg-indigo-50">
-                        <i data-lucide="refresh-ccw" size="16"></i> ล้าง
-                    </button>
-                    <button onclick="window.print()" class="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2">
-                        <i data-lucide="printer"></i> Print / PDF
-                    </button>
+                    <div class="text-right pr-1 text-[11px] font-bold text-gray-500">แบบ ง.4</div>
                 </div>
             </div>
 
             <!-- หัวข้อกลาง -->
-            <div class="text-center mb-10">
+            <div class="text-center mb-10 form4-header">
                 <img src="logo.png" class="w-20 mx-auto mb-4" alt="RMUTP Logo">
                 <h4 class="font-bold text-xl">มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร</h4>
                 <h5 class="font-bold text-lg text-slate-500">รายละเอียดคำชี้แจงค่าครุภัณฑ์</h5>
             </div>
 
-            <div class="space-y-10">
-                <!-- 1-3 -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-red-500">*1. หน่วยงาน</label>
-                        <select id="f-dept" class="input-flat w-full"></select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-red-500">*2. สาขา / งาน</label>
-                        <select id="f-branch" class="input-flat w-full"></select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-red-500">*3. แหล่งเงินงบประมาณ</label>
-                        <div class="flex gap-2">
-                            <select id="f-budget-source" class="input-flat flex-1"></select>
-                            <input id="f-budget-other" placeholder="งบประมาณอื่นๆ (โปรดระบุ)" class="input-flat flex-1 text-xs">
+            <div class="space-y-6">
+
+                <!-- ══ SECTION A: ข้อมูลพื้นฐาน ══ -->
+                <div class="space-y-0 rounded-[1.5rem] border border-gray-100 overflow-hidden shadow-sm">
+
+                    <!-- แถว 1: ปีงบประมาณ | หน่วยงาน | สาขา/งาน -->
+                    <div class="grid grid-cols-3 divide-x divide-gray-100 bg-white">
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">ปีงบประมาณ <span class="text-red-500">*</span></label>
+                            <select id="f-year" class="f4-cell-input"></select>
+                        </div>
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">หน่วยงาน <span class="text-red-500">*</span></label>
+                            <select id="f-dept" class="f4-cell-input"></select>
+                        </div>
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">สาขา / งาน <span class="text-red-500">*</span></label>
+                            <select id="f-branch" class="f4-cell-input"></select>
                         </div>
                     </div>
+
+                    <!-- แถว 2: แหล่งเงินงบประมาณ | อื่นๆ (เต็มแถว) -->
+                    <div class="grid grid-cols-[1fr_1fr] divide-x divide-gray-100 bg-gray-50/50 border-t border-gray-100">
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">แหล่งเงินงบประมาณ <span class="text-red-500">*</span></label>
+                            <select id="f-budget-source" class="f4-cell-input"></select>
+                        </div>
+                        <div class="f4-cell">
+                            <label class="f4-cell-label text-gray-400">อื่นๆ โปรดระบุ</label>
+                            <input id="f-budget-other" placeholder="โปรดระบุ (กรณีเลือกอื่นๆ)" class="f4-cell-input">
+                        </div>
+                    </div>
+
+                    <!-- แถว 3: ประเภทครุภัณฑ์ (+ textarea) | ชื่อรายการ + รายการ -->
+                    <div class="grid grid-cols-2 divide-x divide-gray-100 bg-white border-t border-gray-100 items-start">
+                        <div class="f4-cell space-y-2">
+                            <label class="f4-cell-label">ประเภทครุภัณฑ์ <span class="text-red-500">*</span></label>
+                            <select id="f-category" class="f4-cell-input"></select>
+                            <textarea id="f-building-note" rows="2" class="f4-cell-input text-xs bg-amber-50 border border-amber-200 text-amber-800 placeholder-amber-400 rounded-xl px-3 py-2 w-full resize-none" placeholder="เฉพาะครุภัณฑ์ประกอบอาคาร โปรดกรอกข้อมูลเพิ่มเติม"></textarea>
+                        </div>
+                        <div class="f4-cell space-y-2">
+                            <div>
+                                <label class="f4-cell-label">รายการ <span class="text-red-500">*</span></label>
+                                <select id="f-item" class="f4-cell-input"></select>
+                            </div>
+                            <div>
+                                <label class="f4-cell-label">ชื่อรายการ <span class="text-red-500">*</span></label>
+                                <input id="f-item-desc" placeholder="ระบุ เช่น คอมพิวเตอร์ / ชุดห้องปฏิบัติการ ฯลฯ" class="f4-cell-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- hidden fields เก็บค่าเดิม -->
+                    <input id="f-building-name" class="hidden" />
+                    <input id="f-building-year" class="hidden" />
                 </div>
 
-                <!-- 4-5 -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-red-500">*4. รายการ</label>
-                        <input id="f-item-name" placeholder="ชื่อรายการครุภัณฑ์" class="input-flat w-full">
+                <!-- ══ SECTION B: ความสอดคล้องยุทธศาสตร์ ══ -->
+                <div class="space-y-3" id="f-strat-section">
+                    <div class="text-xs font-bold text-red-500 flex items-center gap-2">
+                        <i data-lucide="target" size="13"></i>
+                        * ความสอดคล้องกับประเด็นยุทธศาสตร์ / กลยุทธ์ / มิติ และ ตัวชี้วัดความสำเร็จตามแผนพัฒนามหาวิทยาลัย
                     </div>
 
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold text-red-500">*5. ประเภทครุภัณฑ์</label>
-                        <div class="pl-4 space-y-3">
-                            <div class="flex flex-col md:flex-row gap-2 items-start md:items-center text-xs">
-                                <span class="font-bold text-gray-600">5.1 ครุภัณฑ์ประกอบอาคาร</span>
-                                <input id="f-building-name" placeholder="ระบุชื่ออาคาร" class="input-flat py-2 flex-1 text-xs">
-                                <span class="font-bold text-gray-600">สร้างเสร็จปีงบประมาณ</span>
-                                <input id="f-building-year" placeholder="ปี งปม." class="input-flat py-2 w-28 text-xs">
-                            </div>
-                            <div class="flex flex-col md:flex-row gap-2">
-                                <div class="flex items-center gap-2 flex-1">
-                                    <span class="text-xs font-bold text-gray-600">5.2 ประเภท</span>
-                                    <select id="f-category" class="input-flat flex-1"></select>
-                                </div>
-                                <input id="f-category-other" placeholder="ครุภัณฑ์อื่นๆ (โปรดระบุ)" class="input-flat flex-1 text-xs">
+                    <!-- Cascade Step-by-Step: ตารางกริด 7 step -->
+                    <div class="rounded-[1.5rem] border border-indigo-100 overflow-hidden shadow-sm">
+
+                        <!-- Step 1: แผนพัฒนา -->
+                        <div class="f4-strat-row bg-white">
+                            <div class="f4-strat-badge bg-indigo-600 text-white">1</div>
+                            <div class="f4-strat-label">แผนพัฒนามหาวิทยาลัย</div>
+                            <div class="f4-strat-field">
+                                <select id="f-plan" class="f4-strat-select" onchange="App.f4CascadeStep('plan')">
+                                    <option value="">— เลือกฉบับแผน —</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- 6-10 -->
-                <div class="space-y-6">
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-bold text-red-500">*6. ความสอดคล้องกับประเด็นยุทธศาสตร์</label>
-                        <select id="f-strat-issue" class="input-flat w-full"></select>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-1.5">
-                            <div class="flex justify-between items-center">
-                                <label class="text-xs font-bold text-red-500">*7. ความสอดคล้องกับวัตถุประสงค์เชิงยุทธศาสตร์</label>
-                                <span class="text-[10px] font-bold text-gray-400"><span id="cnt-obj">0</span>/3000</span>
+                        <!-- Step 2: ประเด็นยุทธศาสตร์ -->
+                        <div class="f4-strat-row bg-indigo-50/30 border-t border-indigo-50">
+                            <div class="f4-strat-badge bg-indigo-500 text-white">2</div>
+                            <div class="f4-strat-label">ประเด็นยุทธศาสตร์</div>
+                            <div class="f4-strat-field">
+                                <select id="f-issue" class="f4-strat-select" disabled onchange="App.f4CascadeStep('issue')">
+                                    <option value="">— เลือกฉบับแผนก่อน —</option>
+                                </select>
                             </div>
-                            <textarea id="f-obj" maxlength="3000" rows="4" class="input-flat w-full" placeholder="พิมพ์..."></textarea>
                         </div>
 
-                        <div class="space-y-1.5">
-                            <div class="flex justify-between items-center">
-                                <label class="text-xs font-bold text-red-500">*8. ความสอดคล้องกับกลยุทธ์</label>
-                                <span class="text-[10px] font-bold text-gray-400"><span id="cnt-strategy">0</span>/3000</span>
+                        <!-- Step 3: วัตถุประสงค์ -->
+                        <div class="f4-strat-row bg-white border-t border-indigo-50">
+                            <div class="f4-strat-badge bg-indigo-400 text-white">3</div>
+                            <div class="f4-strat-label">วัตถุประสงค์เชิงยุทธศาสตร์</div>
+                            <div class="f4-strat-field">
+                                <select id="f-strategy" class="f4-strat-select" disabled onchange="App.f4CascadeStep('strategy')">
+                                    <option value="">— เลือกประเด็นก่อน —</option>
+                                </select>
                             </div>
-                            <textarea id="f-strategy" maxlength="3000" rows="4" class="input-flat w-full" placeholder="พิมพ์..."></textarea>
                         </div>
-                    </div>
 
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-bold text-red-500">*9. ความสอดคล้องกับมิติ</label>
-                        <select id="f-bsc-dim" class="input-flat w-full"></select>
-                    </div>
+                        <!-- Step 4: กลยุทธ์ -->
+                        <div class="f4-strat-row bg-indigo-50/30 border-t border-indigo-50">
+                            <div class="f4-strat-badge bg-purple-500 text-white">4</div>
+                            <div class="f4-strat-label">กลยุทธ์</div>
+                            <div class="f4-strat-field">
+                                <select id="f-dimension" class="f4-strat-select" disabled onchange="App.f4CascadeStep('dimension')">
+                                    <option value="">— เลือกวัตถุประสงค์ก่อน —</option>
+                                </select>
+                            </div>
+                        </div>
 
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold">10. สอดคล้องกับตัวชี้วัดความสำเร็จตามแผนพัฒนามหาวิทยาลัย</label>
-                        <select id="f-strat-kpi" class="input-flat w-full"></select>
+                        <!-- Step 5: กลยุทธ์ย่อย -->
+                        <div class="f4-strat-row bg-white border-t border-indigo-50">
+                            <div class="f4-strat-badge bg-purple-400 text-white">5</div>
+                            <div class="f4-strat-label">กลยุทธ์ย่อย <span class="text-[10px] font-normal text-gray-400">(ถ้ามี)</span></div>
+                            <div class="f4-strat-field">
+                                <select id="f-substrategy" class="f4-strat-select" disabled onchange="App.f4CascadeStep('substrategy')">
+                                    <option value="">— เลือกกลยุทธ์ก่อน —</option>
+                                </select>
+                            </div>
+                        </div>
 
-                        <div class="card-main p-6 bg-indigo-50/20 border border-indigo-100 rounded-[1.5rem] overflow-hidden">
-                            <table class="w-full text-left text-sm">
+                        <!-- Step 6: มิติ -->
+                        <div class="f4-strat-row bg-indigo-50/30 border-t border-indigo-50">
+                            <div class="f4-strat-badge bg-emerald-500 text-white">6</div>
+                            <div class="f4-strat-label">มิติ (BSC)</div>
+                            <div class="f4-strat-field">
+                                <select id="f-kpidim" class="f4-strat-select" disabled onchange="App.f4CascadeStep('kpidim')">
+                                    <option value="">— เลือกกลยุทธ์ก่อน —</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Step 7: ตัวชี้วัด (สีเขียวเน้น) -->
+                        <div class="f4-strat-row bg-emerald-50/40 border-t border-emerald-100">
+                            <div class="f4-strat-badge bg-emerald-600 text-white">7</div>
+                            <div class="f4-strat-label font-black text-emerald-800">ตัวชี้วัด (KPI)</div>
+                            <div class="f4-strat-field">
+                                <select id="f-kpi" class="f4-strat-select border-emerald-200 bg-emerald-50/60" disabled>
+                                    <option value="">— เลือกมิติก่อน —</option>
+                                </select>
+                            </div>
+                        </div>
+
+                    </div><!-- end cascade grid -->
+
+                    <!-- ตารางตัวชี้วัด (+ - แถว) -->
+                    <div class="card-main p-6 bg-indigo-50/20 border border-indigo-100 rounded-[1.5rem] overflow-hidden">
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="text-[11px] font-bold text-gray-500">ตัวชี้วัดตามแผนพัฒนามหาวิทยาลัยฯ <span class="text-gray-400 font-normal">(เพิ่มได้หลายแถว)</span></div>
+                            <div class="flex items-center gap-2 no-print">
+                                <button onclick="App.form4RemoveKpiRows()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2">
+                                    <i data-lucide="minus" size="16"></i> ลบแถว
+                                </button>
+                                <button onclick="App.form4AddKpiRow()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2">
+                                    <i data-lucide="plus" size="16"></i> เพิ่มแถว
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-auto">
+                            <table class="w-full text-left text-sm min-w-[760px]">
                                 <thead class="table-header">
                                     <tr class="bg-indigo-50/40">
-                                        <th class="px-4 py-3">ตัวชี้วัดตามแผนพัฒนามหาวิทยาลัยฯ</th>
-                                        <th class="px-4 py-3 text-center" colspan="2">ค่าเป้าหมาย</th>
+                                        <th class="px-4 py-3 w-14 text-center">เลือก</th>
+                                        <th class="px-4 py-3">ตัวชี้วัด</th>
+                                        <th class="px-4 py-3 w-52">หน่วยนับ</th>
+                                        <th class="px-4 py-3 w-52">จำนวน</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-indigo-100">
-                                    <tr>
-                                        <td class="px-4 py-3"><input id="f-kpi-name" class="input-flat w-full bg-white" placeholder="ระบุ/หรือเลือกจากด้านบน"></td>
-                                        <td class="px-4 py-3"><select id="f-kpi-unit" class="input-flat w-full bg-white"></select></td>
-                                        <td class="px-4 py-3"><input id="f-kpi-target" class="input-flat w-full bg-white" placeholder="ค่าเป้าหมาย"></td>
-                                    </tr>
-                                </tbody>
+                                <tbody id="f-kpi-rows" class="divide-y divide-indigo-100"></tbody>
                             </table>
                         </div>
-
-                        <p id="kpi-role-hint" class="text-[10px] text-gray-400 font-bold hidden">หมายเหตุ: รายการตัวชี้วัดข้อ 10 แสดงตามสิทธิ์ผู้ใช้</p>
                     </div>
                 </div>
 
@@ -200,21 +267,18 @@ const UI = {
                 <div class="space-y-8">
                     <div class="space-y-1.5">
                         <div class="flex justify-between items-center">
-                            <label class="text-xs font-bold text-red-500">*11. เหตุผลความจำเป็น</label>
+                            <label class="text-xs font-bold text-red-500">* เหตุผลความจำเป็น</label>
                             <span class="text-[10px] font-bold text-gray-400"><span id="cnt-need">0</span>/3000</span>
                         </div>
-                        <textarea id="f-need" maxlength="3000" rows="6" class="input-flat w-full" placeholder="- ระบุความสำคัญ ความจำเป็นและเหตุผลในการพัฒนาโครงการใหม่
-- ระบุ Problem Based / Project Based / Area Based / การทบทวนข้อมูล Base line / การทบทวนความก้าวหน้า ความทันสมัยของเทคโนโลยีเป็นต้น
-- ระบุแนวทางการพัฒนาสิ่งใหม่ ตัวอย่างเช่น องค์ความรู้ใหม่ การพัฒนาเทคโนโลยี นวัตกรรม(Product, Service, Process and Managements) เป็นต้น
-- โครงการเมื่อดำเนินการแล้วจะมีอะไรดีขึ้น อย่างไร ใครได้ประโยชน์ ใครนำไปใช้บ้าง"></textarea>
+                        <textarea id="f-need" maxlength="3000" rows="6" class="input-flat w-full" placeholder="โปรดระบุ ..."></textarea>
                     </div>
 
                     <div class="space-y-1.5">
                         <div class="flex justify-between items-center">
-                            <label class="text-xs font-bold text-red-500">*12. วัตถุประสงค์ (ควรระบุสิ่งที่ต้องการทำให้สำเร็จเท่านั้น)</label>
+                            <label class="text-xs font-bold text-red-500">* วัตถุประสงค์ (ควรระบุสิ่งที่ต้องการทำให้สำเร็จเท่านั้น)</label>
                             <span class="text-[10px] font-bold text-gray-400"><span id="cnt-objective2">0</span>/3000</span>
                         </div>
-                        <textarea id="f-objective2" maxlength="3000" rows="4" class="input-flat w-full" placeholder="พิมพ์..."></textarea>
+                        <textarea id="f-objective2" maxlength="3000" rows="4" class="input-flat w-full" placeholder="โปรดระบุ..."></textarea>
                     </div>
 
                     <div class="space-y-3">
@@ -869,6 +933,59 @@ const UI = {
 
             </div>
         </div>
+<!-- ===== ปุ่มล่างสุด บันทึก / ล้างค่า ===== -->
+<div class="no-print mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+    <button onclick="App.saveForm4()"
+        class="flex-1 sm:flex-none sm:w-56 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black shadow-xl flex items-center justify-center gap-3 text-base transition-all">
+        <i data-lucide="save" class="w-5 h-5"></i> บันทึก
+    </button>
+    <button onclick="App.resetForm4()"
+        class="flex-1 sm:flex-none sm:w-44 bg-white text-gray-500 py-4 rounded-2xl font-bold shadow-sm border border-gray-200 flex items-center justify-center gap-3 text-base hover:bg-gray-50 transition-all">
+        <i data-lucide="refresh-ccw" class="w-5 h-5"></i> ล้างค่า
+    </button>
+    <button onclick="window.print()"
+        class="flex-1 sm:flex-none sm:w-44 bg-slate-700 hover:bg-slate-800 text-white py-4 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-3 text-base transition-all">
+        <i data-lucide="printer" class="w-5 h-5"></i> Print / PDF
+    </button>
+</div>
+
+<!-- ===== ตารางรายการที่บันทึก ===== -->
+<div class="no-print mt-12 rounded-[2rem] bg-white border border-indigo-100 shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between gap-4 px-8 py-5 border-b border-indigo-50 bg-indigo-50/40">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
+                <i data-lucide="database" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <div class="font-black text-indigo-950 text-base">รายการที่บันทึกแล้ว</div>
+                <div class="text-[11px] font-bold text-gray-400">คลิก ✏️ เพื่อแก้ไข &nbsp;|&nbsp; 🖨️ เพื่อ Print/PDF &nbsp;|&nbsp; 🗑️ เพื่อลบ</div>
+            </div>
+        </div>
+        <button onclick="App.loadForm4Records()"
+            class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-indigo-600 border border-indigo-50 transition-all" title="รีเฟรช">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm min-w-[700px]">
+            <thead class="table-header">
+                <tr>
+                    <th class="px-4 py-4 text-center w-12">#</th>
+                    <th class="px-4 py-4">ชื่อรายการ</th>
+                    <th class="px-4 py-4">หน่วยงาน</th>
+                    <th class="px-4 py-4">แผนพัฒนา</th>
+                    <th class="px-4 py-4">ผู้บันทึก</th>
+                    <th class="px-4 py-4">วันที่บันทึก</th>
+                    <th class="px-4 py-4 text-center w-36">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="f4-records-tbody" class="divide-y divide-gray-50">
+                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">กำลังโหลด...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Admin Edit Modal Root (เฉพาะหน้า ตั้งต้นข้อมูล) -->
 <div id="admin-edit-modal" class="hidden"></div>`;
     },
@@ -902,97 +1019,173 @@ const UI = {
                     </div>
                     <!-- หน่วยนับ 4 ช่อง ตามสั่ง -->
                     <div class="md:col-span-2 border-t pt-4 flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">หน่วยนับ</label><div class="flex gap-3"><input id="m-unit-1" placeholder="หน่วย 1" class="input-flat flex-1"><input id="m-unit-2" placeholder="หน่วย 2" class="input-flat flex-1"><input id="m-unit-3" placeholder="หน่วย 3" class="input-flat flex-1"><input id="m-unit-4" placeholder="หน่วย 4" class="input-flat flex-1"><button onclick="App.saveUnits()" class="bg-green-500 text-white px-8 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg"><i data-lucide="save" size="18"></i> บันทึกหน่วยนับ</button></div></div>
+
+                    <!-- เพิ่มเติม: หมวดหมู่ย่อย (ประเภทสิ่งของ) + มาตรฐานครุภัณฑ์ (ไม่ผูกปี) -->
+                    <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">หมวดหมู่ย่อย (ประเภทสิ่งของ)</label><div class="flex gap-2"><input id="m-sub-category" placeholder="ใส่ข้อมูลหมวดหมู่ย่อย" class="input-flat flex-1"><button onclick="App.saveMaster('sub_categories', 'm-sub-category')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
+                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">มาตรฐานครุภัณฑ์</label><div class="flex gap-2"><input id="m-asset-standard" placeholder="ใส่ข้อมูลมาตรฐานครุภัณฑ์" class="input-flat flex-1"><button onclick="App.saveMaster('asset_standards', 'm-asset-standard')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
+                    </div>
                 </div>
             </div>
 
             <!-- หมวดโครงสร้างองค์กร (ย้ายพื้นหลังเป็นสีขาว) -->
             <div class="card-main p-8 shadow-xl bg-white"><h5 class="font-black text-blue-800 flex items-center gap-2 mb-6"><i data-lucide="building-2" size="20"></i> หมวดโครงสร้างองค์กร</h5><div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div class="bg-white p-6 rounded-[2rem] border border-blue-50 shadow-sm"><p class="text-[11px] font-black text-blue-600 mb-4 uppercase tracking-wider">หน่วยงาน</p><div class="flex gap-2"><input id="m-dept-name" placeholder="ใส่ข้อมูลหน่วยงาน" class="input-flat flex-1 border-blue-100"><button onclick="App.saveMaster('depts', 'm-dept-name')" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-md"><i data-lucide="save" size="18"></i> บันทึก</button></div></div><div class="bg-white p-6 rounded-[2rem] border border-blue-50 border-dashed shadow-sm"><p class="text-[11px] font-black text-blue-600 mb-4 uppercase tracking-wider">สาขา / งาน (เชื่อมโยงจากหน่วยงาน)</p><div class="space-y-3"><select id="m-dept-select" class="input-flat w-full border-blue-100 font-bold bg-gray-50"></select><div class="flex gap-2"><input id="m-branch-name" placeholder="ระบุชื่อสาขา/งาน..." class="input-flat flex-1 border-blue-100 italic"><button onclick="App.saveBranch()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg"><i data-lucide="link" size="18"></i> เชื่อมโยง</button></div></div></div></div></div>
 
-            <!-- หมวดข้อมูลยุทธศาสตร์และตัวชี้วัด (โปรดระบุความเชื่อมโยง) -->
+            <!-- ===== หมวดข้อมูลยุทธศาสตร์และตัวชี้วัด (ออกแบบใหม่) ===== -->
             <div class="card-main p-8 relative shadow-xl bg-white">
                 <div class="rainbow-line absolute top-0 left-0 w-full h-[3px]"></div>
-                <h5 class="font-black text-purple-800 flex items-center gap-2 mb-6"><i data-lucide="target" size="20"></i> หมวดข้อมูลยุทธศาสตร์และตัวชี้วัด (โปรดระบุความเชื่อมโยง)</h5>
+                <h5 class="font-black text-purple-800 flex items-center gap-2 mb-1">
+                    <i data-lucide="target" size="20"></i> หมวดข้อมูลยุทธศาสตร์และตัวชี้วัด
+                </h5>
+                <p class="text-[11px] text-gray-400 font-bold mb-6">ขั้นที่ 1: บันทึกข้อมูลแต่ละหัวข้อก่อน → ขั้นที่ 2: เชื่อมโยงเป็น 7 Step</p>
 
-                <div class="space-y-6">
-                    <div class="flex flex-col gap-2">
-                        <label class="text-[11px] font-bold text-gray-500">แผนพัฒนามหาวิทยาลัยฉบับที่</label>
-                        <div class="flex gap-2 items-center">
-                            <input id="strat-lvl-9" placeholder="ระบุฉบับที่ ...." class="input-flat flex-1 text-sm bg-gray-50/50">
-                            <button onclick="App.saveStratNew(9)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="save" size="18"></i></button>
+                <!-- ===== ส่วน A: บันทึกข้อมูลรายหัวข้อ (ยังไม่เชื่อมโยง) ===== -->
+                <div class="bg-purple-50/60 border border-purple-100 rounded-2xl p-6 mb-6">
+                    <div class="flex items-center gap-2 mb-5">
+                        <span class="w-7 h-7 rounded-lg bg-purple-600 text-white text-xs font-black flex items-center justify-center">A</span>
+                        <span class="font-black text-purple-800 text-sm">บันทึกข้อมูลแต่ละหัวข้อ (ยังไม่เชื่อมโยง)</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[11px] font-black text-purple-700">📋 ฉบับแผนพัฒนามหาวิทยาลัย</label>
+                            <div class="flex gap-2"><input id="si-plan" placeholder="เช่น ฉบับที่ 13" class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_plans','si-plan')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[11px] font-black text-purple-700">🎯 ประเด็นยุทธศาสตร์</label>
+                            <div class="flex gap-2"><input id="si-issue" placeholder="เช่น ยุทธศาสตร์ที่ 1 มุ่งความเป็นเลิศ..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_issues','si-issue')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[11px] font-black text-purple-700">📌 วัตถุประสงค์เชิงยุทธศาสตร์</label>
+                            <div class="flex gap-2"><input id="si-strategy" placeholder="เช่น วัตถุประสงค์ที่ 1.1..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_strategies','si-strategy')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[11px] font-black text-purple-700">⚡ กลยุทธ์</label>
+                            <div class="flex gap-2"><input id="si-dim" placeholder="เช่น กลยุทธ์ที่ 1 Integrated Innovator..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_dimensions','si-dim')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[11px] font-black text-purple-700">🔹 กลยุทธ์ย่อย</label>
+                            <div class="flex gap-2"><input id="si-sub" placeholder="เช่น กลยุทธ์ย่อยที่ 1.1..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_sub_strategies','si-sub')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[11px] font-black text-purple-700">🔷 มิติ</label>
+                            <div class="flex gap-2"><input id="si-kpidim" placeholder="เช่น มิติที่ 1 ด้านนวัตกรรม..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_kpis','si-kpidim','dimension')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
+                        </div>
+                        <div class="flex flex-col gap-1.5 md:col-span-2">
+                            <label class="text-[11px] font-black text-purple-700">📊 ตัวชี้วัด</label>
+                            <div class="flex gap-2"><input id="si-kpi" placeholder="เช่น จำนวนนักศึกษาที่ได้รับการพัฒนา..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_kpis','si-kpi','kpi')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="flex flex-col gap-2 border-l-2 border-purple-100 pl-4">
-                        <label class="text-[11px] font-bold text-gray-500">โปรดเลือก "แผนพัฒนามหาวิทยาลัยฉบับที่"</label>
-                        <div class="flex gap-2 items-center">
-                            <select id="strat-parent-10" class="input-flat w-56 text-sm bg-gray-50/50 font-bold"></select>
-                            <input id="strat-lvl-10" placeholder="เลือกฉบับที่ > ระบุประเด็นยุทธศาสตร์..." class="input-flat flex-1 text-sm bg-gray-50/50">
-                            <button onclick="App.saveStratNew(10)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="link" size="18"></i></button>
+                <!-- ===== ส่วน B: เชื่อมโยง 7 Step ===== -->
+                <div class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-6">
+                    <div class="flex items-center gap-2 mb-5">
+                        <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white text-xs font-black flex items-center justify-center">B</span>
+                        <span class="font-black text-indigo-800 text-sm">เชื่อมโยงข้อมูลตามลำดับ (7 Step)</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-indigo-50">
+                            <span class="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">1</span>
+                            <span class="text-[11px] font-black text-gray-500 w-52 shrink-0">ฉบับแผนพัฒนามหาวิทยาลัย</span>
+                            <select id="lnk-plan" onchange="App.onLinkChange('plan')" class="input-flat flex-1 min-w-0 text-sm font-bold bg-gray-50/50"><option value="">— เลือกฉบับที่ —</option></select>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-indigo-50">
+                            <span class="w-6 h-6 rounded-full bg-indigo-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">2</span>
+                            <span class="text-[11px] font-black text-gray-500 w-52 shrink-0">ประเด็นยุทธศาสตร์</span>
+                            <select id="lnk-issue" onchange="App.onLinkChange('issue')" disabled class="input-flat flex-1 min-w-0 text-sm font-bold bg-gray-50/50 opacity-60"><option value="">— เลือกยุทธศาสตร์ —</option></select>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-indigo-50">
+                            <span class="w-6 h-6 rounded-full bg-indigo-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">3</span>
+                            <span class="text-[11px] font-black text-gray-500 w-52 shrink-0">วัตถุประสงค์เชิงยุทธศาสตร์</span>
+                            <select id="lnk-strategy" onchange="App.onLinkChange('strategy')" disabled class="input-flat flex-1 min-w-0 text-sm font-bold bg-gray-50/50 opacity-60"><option value="">— เลือกวัตถุประสงค์ฯ —</option></select>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-indigo-50">
+                            <span class="w-6 h-6 rounded-full bg-indigo-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">4</span>
+                            <span class="text-[11px] font-black text-gray-500 w-52 shrink-0">กลยุทธ์</span>
+                            <select id="lnk-dim" onchange="App.onLinkChange('dim')" disabled class="input-flat flex-1 min-w-0 text-sm font-bold bg-gray-50/50 opacity-60"><option value="">— เลือกกลยุทธ์ —</option></select>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-indigo-50">
+                            <span class="w-6 h-6 rounded-full bg-indigo-400 text-white text-[10px] font-black flex items-center justify-center shrink-0">5</span>
+                            <span class="text-[11px] font-black text-gray-500 w-52 shrink-0">กลยุทธ์ย่อย</span>
+                            <select id="lnk-sub" onchange="App.onLinkChange('sub')" disabled class="input-flat flex-1 min-w-0 text-sm font-bold bg-gray-50/50 opacity-60"><option value="">— เลือกกลยุทธ์ย่อย —</option></select>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-indigo-50">
+                            <span class="w-6 h-6 rounded-full bg-indigo-400 text-white text-[10px] font-black flex items-center justify-center shrink-0">6</span>
+                            <span class="text-[11px] font-black text-gray-500 w-52 shrink-0">มิติ</span>
+                            <select id="lnk-kpidim" onchange="App.onLinkChange('kpidim')" disabled class="input-flat flex-1 min-w-0 text-sm font-bold bg-gray-50/50 opacity-60"><option value="">— เลือกมิติ —</option></select>
+                        </div>
+                        <div class="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-indigo-50">
+                            <span class="w-6 h-6 rounded-full bg-green-600 text-white text-[10px] font-black flex items-center justify-center shrink-0">7</span>
+                            <span class="text-[11px] font-black text-gray-500 w-52 shrink-0">ตัวชี้วัด</span>
+                            <select id="lnk-kpi" disabled class="input-flat flex-1 min-w-0 text-sm font-bold bg-gray-50/50 opacity-60"><option value="">— เลือกตัวชี้วัด —</option></select>
+                        </div>
+                        <div class="flex justify-end pt-3">
+                            <button onclick="App.saveStratLink()" class="bg-green-600 hover:bg-green-700 text-white font-black px-8 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm">
+                                <i data-lucide="check-circle" size="18"></i> บันทึกความเชื่อมโยง
+                            </button>
                         </div>
                     </div>
-
-                    <div class="flex flex-col gap-2 border-l-2 border-purple-100 pl-4">
-                        <label class="text-[11px] font-bold text-gray-500">โปรดเลือก "ความสอดคล้องกับประเด็นยุทธศาสตร์"</label>
-                        <div class="flex gap-2 items-center">
-                            <select id="strat-parent-11" class="input-flat w-56 text-sm bg-gray-50/50 font-bold"></select>
-                            <input id="strat-lvl-11" placeholder="เลือกฉบับที่ > ประเด็นยุทธศาสตร์ > ระบุกลยุทธ์..." class="input-flat flex-1 text-sm bg-gray-50/50">
-                            <button onclick="App.saveStratNew(11)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="link" size="18"></i></button>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col gap-2 border-l-2 border-purple-100 pl-4">
-                        <label class="text-[11px] font-bold text-gray-500">โปรดเลือก "ความสอดคล้องกับกลยุทธ์"</label>
-                        <div class="flex gap-2 items-center">
-                            <select id="strat-parent-12" class="input-flat w-56 text-sm bg-gray-50/50 font-bold"></select>
-                            <input id="strat-lvl-12" placeholder="เลือกฉบับที่ > ประเด็นยุทธศาสตร์ > กลยุทธ์ > ระบุมิติ..." class="input-flat flex-1 text-sm bg-gray-50/50">
-                            <button onclick="App.saveStratNew(12)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="link" size="18"></i></button>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col gap-2 border-l-2 border-purple-100 pl-4">
-                        <label class="text-[11px] font-bold text-gray-500">โปรดเลือก "ความสอดคล้องกับมิติ"</label>
-                        <div class="flex gap-2 items-center">
-                            <select id="strat-parent-13" class="input-flat w-56 text-sm bg-gray-50/50 font-bold"></select>
-                            <input id="strat-lvl-13" placeholder="เลือกฉบับแผน > ประเด็นยุทธศาสตร์ > กลยุทธ์ > มิติ > ระบุตัวชี้วัด..." class="input-flat flex-1 text-sm bg-gray-50/50">
-                            <button onclick="App.saveStratNew(13)" class="p-3 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700"><i data-lucide="link" size="18"></i></button>
-                        </div>
-                    </div>
-                </div></div>
+                </div>
             </div>
             </div>
 
-            
-            
-            <!-- หมวดการวิเคราะห์ครุภัณฑ์ตามวัตถุประสงค์ : ถูกลบออกตามข้อกำหนด -->
-
-
-<!-- ตารางแสดงผลการบันทึก (ดึงข้อมูลจริงจากฐานข้อมูล) -->
-<div class="mt-10 rounded-[2.5rem] bg-slate-900/8 border border-slate-200 p-6 md:p-8 space-y-6 animate-in slide-in-from-bottom-4 duration-700">
-    <div class="flex items-center justify-between flex-wrap gap-3">
+<!-- ===== ตารางที่ 1: ข้อมูลดิบ 7 หน้า ===== -->
+<div class="mt-8 card-main p-8 bg-white shadow-xl border border-purple-50">
+    <div class="flex items-center justify-between gap-4 mb-5 flex-wrap">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-slate-900/10 flex items-center justify-center">
-                <i data-lucide="table" class="w-5 h-5 text-slate-800"></i>
-            </div>
+            <div class="w-9 h-9 rounded-xl bg-purple-600 flex items-center justify-center shrink-0"><i data-lucide="database" class="w-5 h-5 text-white"></i></div>
             <div>
-                <h4 class="font-black text-slate-900 text-lg">ตารางแสดงผลการบันทึก</h4>
-                <div class="text-[11px] font-bold text-slate-500 -mt-0.5">ส่วนนี้คือผลลัพธ์จากการบันทึกจริง (ค้นหา • แก้ไข/ลบ • 10 รายการ/หน้า)</div>
+                <div class="font-black text-purple-950 text-base">ตารางที่ 1 — ข้อมูลที่บันทึกทั้งหมด</div>
+                <div id="strat-t1-badge" class="text-[11px] font-bold text-purple-600">หน้า 1 / 7 — ฉบับแผนพัฒนามหาวิทยาลัย</div>
             </div>
         </div>
+        <div class="flex items-center gap-2">
+            <button onclick="App.stratT1Prev()" title="ก่อนหน้า" class="w-9 h-9 rounded-xl border border-purple-100 bg-white hover:bg-purple-50 flex items-center justify-center text-purple-600 shadow-sm"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+            <button onclick="App.stratT1Next()" title="ถัดไป"  class="w-9 h-9 rounded-xl border border-purple-100 bg-white hover:bg-purple-50 flex items-center justify-center text-purple-600 shadow-sm"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+        </div>
     </div>
+    <div id="strat-t1-p1">${this.adminTableBlock('ฉบับแผนพัฒนามหาวิทยาลัย','strat_plans',['ลำดับ','ชื่อฉบับแผน','วันที่บันทึก'])}</div>
+    <div id="strat-t1-p2" class="hidden">${this.adminTableBlock('ประเด็นยุทธศาสตร์','strat_issues',['ลำดับ','ชื่อประเด็นยุทธศาสตร์','วันที่บันทึก'])}</div>
+    <div id="strat-t1-p3" class="hidden">${this.adminTableBlock('วัตถุประสงค์เชิงยุทธศาสตร์','strat_strategies',['ลำดับ','ชื่อวัตถุประสงค์เชิงยุทธศาสตร์','วันที่บันทึก'])}</div>
+    <div id="strat-t1-p4" class="hidden">${this.adminTableBlock('กลยุทธ์','strat_dimensions',['ลำดับ','ชื่อกลยุทธ์','วันที่บันทึก'])}</div>
+    <div id="strat-t1-p5" class="hidden">${this.adminTableBlock('กลยุทธ์ย่อย','strat_sub_strategies',['ลำดับ','ชื่อกลยุทธ์ย่อย','วันที่บันทึก'])}</div>
+    <div id="strat-t1-p6" class="hidden">${this.adminTableBlock('มิติ','strat_kpis_dim',['ลำดับ','ชื่อมิติ','ประเภท','วันที่บันทึก'])}</div>
+    <div id="strat-t1-p7" class="hidden">${this.adminTableBlock('ตัวชี้วัด','strat_kpis_kpi',['ลำดับ','ชื่อตัวชี้วัด','ประเภท','วันที่บันทึก'])}</div>
+</div>
+
+<!-- ===== ตารางที่ 2: ความเชื่อมโยง Step ===== -->
+<div class="mt-6 card-main p-8 bg-white shadow-xl border border-indigo-50">
+    <div class="flex items-center gap-3 mb-5">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0"><i data-lucide="git-branch" class="w-5 h-5 text-white"></i></div>
+        <div>
+            <div class="font-black text-indigo-950 text-base">ตารางที่ 2 — ความเชื่อมโยง (Step-by-Step)</div>
+            <div class="text-[11px] font-bold text-gray-400">ข้อมูลที่เชื่อมโยงครบ 7 ขั้น (แก้ไข / ลบได้)</div>
+        </div>
+    </div>
+    ${this.adminTableBlock('แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง','strat_links',['ลำดับ','ฉบับแผน','ยุทธศาสตร์','วัตถุประสงค์ฯ','กลยุทธ์','กลยุทธ์ย่อย','มิติ','ตัวชี้วัด','วันที่บันทึก'])}
+</div>
+
+<!-- ตารางข้อมูลทั่วไป -->
+<div class="mt-6 rounded-[2.5rem] bg-slate-900/8 border border-slate-200 p-6 md:p-8 space-y-6">
     <div class="space-y-8">
-        <!-- แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง (ตารางรวม) -->
-    ${this.adminTableBlock('แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง', 'strat_links', ['ลำดับ','ฉบับแผน','ประเด็นยุทธศาสตร์','กลยุทธ์','มิติ','ตัวชี้วัด','วันที่บันทึก'])}
-
-${this.adminTableBlock('ประเภทเงินงบประมาณ', 'budget_types', ['ลำดับ','ชื่อประเภทเงินงบประมาณ','วันที่บันทึก'])}
-    ${this.adminTableBlock('ปีงบประมาณ', 'years', ['ลำดับ','ปี พ.ศ.','สถานะปีงบประมาณ','หมายเหตุ','วันที่บันทึก'])}
-    ${this.adminTableBlock('รายการ', 'items', ['ลำดับ','ชื่อรายการ','วันที่บันทึก'])}
-    ${this.adminTableBlock('ประเภทครุภัณฑ์', 'categories', ['ลำดับ','ชื่อประเภท','วันที่บันทึก'])}
-    ${this.adminTableBlock('หน่วยงาน', 'depts', ['ลำดับ','ชื่อหน่วยงาน','วันที่บันทึก'])}
-    ${this.adminTableBlock('สาขา / งาน', 'branches', ['ลำดับ','หน่วยงาน','สาขา/งาน','วันที่บันทึก'])}
-
+    ${this.adminTableBlock('ประเภทเงินงบประมาณ','budget_types',['ลำดับ','ชื่อประเภทเงินงบประมาณ','วันที่บันทึก'])}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        ${this.adminMiniTableBlock('ปีงบประมาณ','years',['ลำดับ','ปี พ.ศ.','สถานะ','หมายเหตุ','วันที่บันทึก'])}
+        ${this.adminMiniTableBlock('หน่วยนับ','units',['ลำดับ','ชื่อหน่วยนับ','วันที่บันทึก'])}
+    </div>
+    ${this.adminTableBlock('หมวดหมู่ย่อย (ประเภทสิ่งของ)','sub_categories',['ลำดับ','ชื่อหมวดหมู่ย่อย','วันที่บันทึก'])}
+    ${this.adminTableBlock('มาตรฐานครุภัณฑ์','asset_standards',['ลำดับ','ชื่อมาตรฐาน','วันที่บันทึก'])}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        ${this.adminMiniTableBlock('รายการ','items',['ลำดับ','ชื่อรายการ','วันที่บันทึก'])}
+        ${this.adminMiniTableBlock('ประเภทครุภัณฑ์','categories',['ลำดับ','ชื่อประเภท','วันที่บันทึก'])}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        ${this.adminMiniTableBlock('หน่วยงาน','depts',['ลำดับ','ชื่อหน่วยงาน','วันที่บันทึก'])}
+        ${this.adminMiniTableBlock('สาขา / งาน','branches',['ลำดับ','หน่วยงาน','สาขา/งาน','วันที่บันทึก'])}
+    </div>
     </div>
 </div>
-<!-- Admin Edit Modal Root (เฉพาะหน้า ตั้งต้นข้อมูล) -->
+<!-- Admin Edit Modal Root -->
 <div id="admin-edit-modal" class="hidden"></div>`;
     },
 
@@ -1064,4 +1257,43 @@ adminMiniTableBlock(title, key, headers) {
     adminUserTemplate() {
         return `<div class="card-main relative overflow-hidden p-10"><div class="rainbow-line absolute top-0 left-0 w-full h-1"></div><h3 class="text-[#4c1d95] font-black text-2xl flex items-center gap-3 mb-10"><i data-lucide="users" size="28"></i> จัดการผู้ใช้งานระบบ</h3><div class="bg-[#f5f3ff] p-8 rounded-[2rem] border border-purple-100 shadow-sm mb-12"><div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 items-end"><input type="hidden" id="u-edit-id"><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Username</label><input id="u-user" placeholder="ระบุชื่อผู้ใช้" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Password</label><input id="u-pass" placeholder="ระบุรหัสผ่าน" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ชื่อ-นามสกุล</label><input id="u-fullname" placeholder="ระบุชื่อ-สกุล" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">สิทธิ์การใช้งาน</label><select id="u-role" class="input-flat w-full bg-white font-bold"><option value="admin">ผู้ดูแลระบบ</option><option value="manager">ผู้บริหาร</option><option value="staff_central">เจ้าหน้าที่ส่วนกลาง</option><option value="staff_dept">เจ้าหน้าที่หน่วยงาน</option></select></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ตำแหน่ง</label><input id="u-pos" placeholder="ระบุตำแหน่ง" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">หน่วยงาน</label><select id="u-dept-select" class="input-flat w-full bg-white font-bold"></select></div><div class="lg:col-span-2 flex gap-2 justify-end"><button id="btn-save-user" onclick="App.saveUser()" class="bg-[#10b981] hover:bg-green-600 text-white h-[42px] px-6 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all"><i data-lucide="check-circle" size="18"></i> บันทึก</button><button onclick="App.resetUserForm()" class="bg-gray-100 text-gray-400 h-[42px] w-[42px] rounded-xl flex items-center justify-center hover:bg-gray-200"><i data-lucide="refresh-ccw" size="18"></i></button></div></div></div><div class="overflow-hidden border border-purple-50 rounded-[2rem] bg-white shadow-xl"><table class="w-full text-left text-sm"><thead class="table-header"><tr class="bg-indigo-50/50"><th class="px-6 py-5">Username</th><th class="px-6 py-5">Password</th><th class="px-6 py-5">ชื่อ - นามสกุล</th><th class="px-6 py-5 text-center">สิทธิ์</th><th class="px-6 py-5">ตำแหน่ง</th><th class="px-6 py-5">หน่วยงาน</th><th class="px-6 py-5">วันที่บันทึก</th><th class="px-6 py-5 text-center">จัดการ</th></tr></thead><tbody id="user-list-body" class="divide-y divide-gray-50"></tbody></table></div><div id="user-edit-modal" class="hidden"></div></div>`;
     }
+    
 };
+/* ===== RENDER TABLE ===== */
+
+function renderForm4Table(data) {
+    const el = document.getElementById("form4-table");
+
+    if (!el) return;
+
+    el.innerHTML = `
+    <div class="card-main p-4">
+        <table class="w-full text-sm">
+            <thead class="table-header">
+                <tr>
+                    <th>รายการ</th>
+                    <th>วงเงิน</th>
+                    <th>หน่วยงาน</th>
+                    <th>ปี</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data.map(d => `
+                    <tr>
+                        <td>${d.itemName || '-'}</td>
+                        <td>${(d.totalAmount || 0).toLocaleString()}</td>
+                        <td>${d.deptName || '-'}</td>
+                        <td>${d.fiscalYear || '-'}</td>
+                        <td class="space-x-2">
+                            <button onclick='previewForm4(${JSON.stringify(d)})'>👁</button>
+                            <button onclick='loadForm4ToForm("${d.id}")'>✏️</button>
+                            <button onclick='deleteForm4("${d.id}")'>🗑</button>
+                        </td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    </div>
+    `;
+}
