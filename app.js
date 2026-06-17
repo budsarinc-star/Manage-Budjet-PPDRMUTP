@@ -1845,6 +1845,38 @@ adminBuildStratLinks() {
     if (st.page < 1) st.page = 1;
 },
 
+// เมื่อแก้ชื่อใน "ตารางที่ 1" (strat_plans / strat_issues / strat_strategies / strat_dimensions / strat_kpis)
+// ให้ไล่อัปเดต "สำเนาชื่อ" ที่เก็บไว้ใน strat_links (ตารางที่ 2) ทุกแถวที่อ้างอิง id นั้นด้วย
+// mapping: collection -> { idField ใน strat_links, nameField ใน strat_links }
+async adminSyncLinkNames(col, docId, newName) {
+    if (!docId || typeof newName !== 'string' || !newName) return;
+    const fieldMap = {
+        strat_plans:      [{ idField: 'planId',     nameField: 'planName' }],
+        strat_issues:      [{ idField: 'issueId',    nameField: 'issueName' }],
+        strat_strategies:  [{ idField: 'strategyId', nameField: 'strategyName' }],
+        strat_dimensions:  [{ idField: 'dimId',      nameField: 'dimName' }],
+        // strat_kpis ใช้ร่วมกัน 2 แบบ (มิติ = kpiDimId, ตัวชี้วัด = kpiId) แยกด้วย type ของ doc ที่แก้
+        strat_kpis_dim:    [{ idField: 'kpiDimId',   nameField: 'kpiDimName' }],
+        strat_kpis_kpi:    [{ idField: 'kpiId',      nameField: 'kpiName' }],
+    };
+    const targets = fieldMap[col];
+    if (!targets) return;
+
+    try {
+        const dataRoot = db.collection('artifacts').doc(appId).collection('public').doc('data');
+        const linksCol = dataRoot.collection('strat_links');
+        for (const { idField, nameField } of targets) {
+            const snap = await linksCol.where(idField, '==', docId).get();
+            if (snap.empty) continue;
+            const batch = db.batch();
+            snap.docs.forEach(d => batch.update(d.ref, { [nameField]: newName }));
+            await batch.commit();
+        }
+    } catch (e) {
+        console.error('adminSyncLinkNames error', col, docId, e);
+    }
+},
+
 adminFilter(key) {
     const st = this.ensureAdminTableState(key);
     const el = document.getElementById(`adm-search-${key}`);
@@ -2098,88 +2130,27 @@ async adminEdit(key, id) {
         this.showLoader();
 
         if (key === 'strat_links') {
-            // หา row จาก fullData เพื่อดึง _col และ _realId
-            const rows  = adminTableState['strat_links']?.fullData || [];
-            const row   = rows.find(r => r.id === id);
-            if (!row) { alert('ไม่พบข้อมูล'); return; }
-
-            const realCol = row._col   || 'strat_kpis';
-            const realId  = row._realId || id;
-
-            // ดึงข้อมูลจริงทุกระดับจาก Firestore เพื่อให้แก้ไขได้ครบ
+            // อ่าน ids/ชื่อทั้งหมดตรงจาก strat_links doc เอง (เป็น source of truth อยู่แล้ว)
             const dataRoot = db.collection('artifacts').doc(appId).collection('public').doc('data');
+            const linkSnap = await dataRoot.collection('strat_links').doc(id).get();
+            if (!linkSnap.exists) { alert('ไม่พบข้อมูล'); return; }
+            const lnk = linkSnap.data();
 
-            // โหลด doc ของ level ที่ row นี้ชี้อยู่
-            const snap = await this.getAdminColRef(realCol).doc(realId).get();
-            const d    = snap.exists ? snap.data() : {};
+            const planId        = lnk.planId        || '';
+            const issueId       = lnk.issueId        || '';
+            const strategyId    = lnk.strategyId     || '';
+            const dimId         = lnk.dimId          || '';
+            const subStrategyId = lnk.subId          || '';
+            const kpiDimId      = lnk.kpiDimId       || '';
+            const kpiId         = lnk.kpiId          || '';
 
-            // ไล่หา IDs ของทุกระดับจาก row data + doc data
-            let planId = '', planName = row.planName && row.planName !== '-' ? row.planName : '';
-            let issueId = '', issueName = row.issueName && row.issueName !== '-' ? row.issueName : '';
-            let strategyId = '', strategyName = row.strategyName && row.strategyName !== '-' ? row.strategyName : '';
-            let dimId = '', dimName = row.dimName && row.dimName !== '-' ? row.dimName : '';
-            let subStrategyId = '', subStrategyName = row.subStrategyName && row.subStrategyName !== '-' ? row.subStrategyName : '';
-            let kpiDimId = '', kpiDimName = row.kpiDimName && row.kpiDimName !== '-' ? row.kpiDimName : '';
-            let kpiName = row.name && row.name !== '-' ? row.name : '';
-
-            // ดึง IDs จาก collection chain ตาม realCol
-            if (realCol === 'strat_kpis') {
-                // kpi item หรือ kpi dimension
-                if (d.type === 'kpi') {
-                    kpiName = d.name || kpiName;
-                    kpiDimId = d.bscId || '';
-                    subStrategyId = d.subStrategyId || '';
-                } else {
-                    kpiDimName = d.name || kpiDimName;
-                    kpiDimId = realId;
-                    subStrategyId = d.subStrategyId || '';
-                }
-                dimId = d.bscId || d.dimId || '';
-                strategyId = d.strategyId || '';
-                issueId = d.issueId || '';
-                planId = d.planId || '';
-            } else if (realCol === 'strat_sub_strategies') {
-                subStrategyName = d.name || subStrategyName;
-                subStrategyId = realId;
-                dimId = d.dimId || '';
-                strategyId = d.strategyId || '';
-                issueId = d.issueId || '';
-                planId = d.planId || '';
-            } else if (realCol === 'strat_dimensions') {
-                dimName = d.name || dimName;
-                dimId = realId;
-                strategyId = d.strategyId || '';
-                issueId = d.issueId || '';
-                planId = d.planId || '';
-            } else if (realCol === 'strat_strategies') {
-                strategyName = d.name || strategyName;
-                strategyId = realId;
-                issueId = d.issueId || '';
-                planId = d.planId || '';
-            } else if (realCol === 'strat_issues') {
-                issueName = d.name || issueName;
-                issueId = realId;
-                planId = d.planId || '';
-            } else if (realCol === 'strat_plans') {
-                planName = d.name || planName;
-                planId = realId;
-            }
-
-            // ดึงชื่อปัจจุบันจากฐานข้อมูลสำหรับแต่ละระดับที่มี ID
-            const fetchName = async (col, docId) => {
-                if (!docId) return '';
-                try {
-                    const s = await dataRoot.collection(col).doc(docId).get();
-                    return s.exists ? (s.data().name || '') : '';
-                } catch { return ''; }
-            };
-
-            if (planId && !planName) planName = await fetchName('strat_plans', planId);
-            if (issueId && !issueName) issueName = await fetchName('strat_issues', issueId);
-            if (strategyId && !strategyName) strategyName = await fetchName('strat_strategies', strategyId);
-            if (dimId && !dimName) dimName = await fetchName('strat_dimensions', dimId);
-            if (subStrategyId && !subStrategyName) subStrategyName = await fetchName('strat_sub_strategies', subStrategyId);
-            if (kpiDimId && !kpiDimName) kpiDimName = await fetchName('strat_kpis', kpiDimId);
+            const planName        = lnk.planName        || '';
+            const issueName       = lnk.issueName        || '';
+            const strategyName    = lnk.strategyName     || '';
+            const dimName         = lnk.dimName          || '';
+            const subStrategyName = lnk.subName          || '';
+            const kpiDimName      = lnk.kpiDimName       || '';
+            const kpiName         = lnk.kpiName          || '';
 
             // helper: always render as editable textarea
             const fieldRow = (label, inputId, value) => `
@@ -2202,15 +2173,14 @@ async adminEdit(key, id) {
                     </button>
                 </div>
                 <div class="p-8 space-y-4 max-h-[70vh] overflow-y-auto">
-                    <input type="hidden" id="adm-edit-strat-realcol"    value="${realCol}">
-                    <input type="hidden" id="adm-edit-strat-realid"     value="${realId}">
+                    <input type="hidden" id="adm-edit-strat-linkid"     value="${id}">
                     <input type="hidden" id="adm-edit-strat-planid"     value="${planId}">
                     <input type="hidden" id="adm-edit-strat-issueid"    value="${issueId}">
                     <input type="hidden" id="adm-edit-strat-strategyid" value="${strategyId}">
                     <input type="hidden" id="adm-edit-strat-dimid"      value="${dimId}">
                     <input type="hidden" id="adm-edit-strat-substratid" value="${subStrategyId}">
                     <input type="hidden" id="adm-edit-strat-kpidimid"   value="${kpiDimId}">
-                    <input type="hidden" id="adm-edit-strat-kpitype"    value="${d.type || ''}">
+                    <input type="hidden" id="adm-edit-strat-kpiid"      value="${kpiId}">
 
                     ${fieldRow('ฉบับแผน', 'adm-edit-strat-plan', planName)}
                     ${fieldRow('ประเด็นยุทธศาสตร์', 'adm-edit-strat-issue', issueName)}
@@ -2273,15 +2243,14 @@ async adminSaveStratEdit() {
     try {
         const sv = (eid) => document.getElementById(eid)?.value?.trim() || '';
 
-        let realCol    = sv('adm-edit-strat-realcol');
-        let realId     = sv('adm-edit-strat-realid');
+        const linkId   = sv('adm-edit-strat-linkid');
         let planId     = sv('adm-edit-strat-planid');
         let issueId    = sv('adm-edit-strat-issueid');
         let strategyId = sv('adm-edit-strat-strategyid');
         let dimId      = sv('adm-edit-strat-dimid');
         let subStratId = sv('adm-edit-strat-substratid');
         let kpiDimId   = sv('adm-edit-strat-kpidimid');
-        const kpiType  = sv('adm-edit-strat-kpitype');
+        let kpiId      = sv('adm-edit-strat-kpiid');
 
         const planName     = sv('adm-edit-strat-plan');
         const issueName    = sv('adm-edit-strat-issue');
@@ -2291,7 +2260,7 @@ async adminSaveStratEdit() {
         const kpiDimName   = sv('adm-edit-strat-kpidim');
         const kpiName      = sv('adm-edit-strat-kpi');
 
-        if (!realCol) return alert('ไม่พบข้อมูล');
+        if (!linkId) return alert('ไม่พบข้อมูล');
 
         this.showLoader();
 
@@ -2321,9 +2290,24 @@ async adminSaveStratEdit() {
 
         // ตัวชี้วัด (type=kpi)
         if (kpiName) {
-            const kpiDocId = (kpiType === 'kpi' && realId) ? realId : '';
-            await upsert('strat_kpis', kpiDocId, { name: kpiName, type: 'kpi', bscId: kpiDimId, subStrategyId: subStratId, dimId, strategyId, issueId, planId });
+            kpiId = await upsert('strat_kpis', kpiId, { name: kpiName, type: 'kpi', bscId: kpiDimId, subStrategyId: subStratId, dimId, strategyId, issueId, planId });
         }
+
+        // ── อัปเดต strat_links doc ของแถวนี้เองให้ ids/ชื่อตรงกับที่แก้ไขล่าสุด ──
+        await dataRoot.collection('strat_links').doc(linkId).set({
+            planId, planName, issueId, issueName, strategyId, strategyName,
+            dimId, dimName, subId: subStratId, subName: subStratName,
+            kpiDimId, kpiDimName, kpiId, kpiName,
+            updatedAt: now
+        }, { merge: true });
+
+        // ── sync ชื่อใหม่เข้าทุกแถวของ strat_links อื่นๆ ที่อ้างอิง id เดียวกัน (อาจมีมากกว่า 1 แถว) ──
+        if (planId && planName)         await this.adminSyncLinkNames('strat_plans',      planId,     planName);
+        if (issueId && issueName)       await this.adminSyncLinkNames('strat_issues',     issueId,    issueName);
+        if (strategyId && strategyName) await this.adminSyncLinkNames('strat_strategies', strategyId, strategyName);
+        if (dimId && dimName)           await this.adminSyncLinkNames('strat_dimensions', dimId,      dimName);
+        if (kpiDimId && kpiDimName)     await this.adminSyncLinkNames('strat_kpis_dim',    kpiDimId,   kpiDimName);
+        if (kpiId && kpiName)           await this.adminSyncLinkNames('strat_kpis_kpi',    kpiId,      kpiName);
 
         alert('บันทึกสำเร็จ');
         this.adminCloseEditModal();
@@ -2444,6 +2428,12 @@ async adminModalSave(key, id) {
 
                 await batch.commit();
 
+                if (planId && planName)         await this.adminSyncLinkNames('strat_plans',      planId,     planName);
+                if (issueId && issueName)       await this.adminSyncLinkNames('strat_issues',     issueId,    issueName);
+                if (strategyId && strategyName) await this.adminSyncLinkNames('strat_strategies', strategyId, strategyName);
+                if (dimId && dimName)           await this.adminSyncLinkNames('strat_dimensions', dimId,      dimName);
+                if (kpiName)                    await this.adminSyncLinkNames('strat_kpis_kpi',   id,         kpiName);
+
                 alert('บันทึกสำเร็จ');
                 await this.refreshAdminStratLinks();
                 this.adminCloseEditModal();
@@ -2458,6 +2448,17 @@ async adminModalSave(key, id) {
                 name,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+
+            // ── sync ชื่อใหม่เข้า strat_links (ตารางที่ 2) ให้ตรงกันทันที ──
+            if (['strat_plans','strat_issues','strat_strategies','strat_dimensions'].includes(key)) {
+                await this.adminSyncLinkNames(key, id, name);
+            } else if (key === 'strat_kpis') {
+                // strat_kpis ใช้ร่วมกัน 2 แบบ: มิติ (type='dimension') กับ ตัวชี้วัด (type='kpi')
+                const snap = await this.getAdminColRef('strat_kpis').doc(id).get();
+                const docType = snap.exists ? snap.data().type : '';
+                await this.adminSyncLinkNames(docType === 'kpi' ? 'strat_kpis_kpi' : 'strat_kpis_dim', id, name);
+            }
+            await this.refreshAdminStratLinks();
 
             alert('บันทึกสำเร็จ');
             await this.loadAdminTable(key);
@@ -2488,107 +2489,48 @@ async adminDelete(key, id) {
             return;
         }
 
-        // ─── strat_links: full-chain delete with in-use guard ──────────
-        const rows = adminTableState['strat_links']?.fullData || [];
-        const row  = rows.find(r => r.id === id);
-        if (!row) { alert('ไม่พบข้อมูล'); return; }
-
-        // collect all IDs in this row's chain
-        const chainIds = {
-            planId:      row._planId      || (row._col === 'strat_plans'          ? row._realId : ''),
-            issueId:     row._issueId     || (row._col === 'strat_issues'         ? row._realId : ''),
-            strategyId:  row._strategyId  || (row._col === 'strat_strategies'     ? row._realId : ''),
-            dimId:       row._dimId       || (row._col === 'strat_dimensions'     ? row._realId : ''),
-            subStratId:  row._subStratId  || (row._col === 'strat_sub_strategies' ? row._realId : ''),
-            kpiDimId:    row._kpiDimId    || (row._col === 'strat_kpis' && row._kpiType !== 'kpi' ? row._realId : ''),
-            kpiItemId:   row._col === 'strat_kpis' && row._kpiType === 'kpi' ? row._realId : '',
-        };
-
-        // re-fetch the actual doc to get correct parent IDs
+        // ─── strat_links: ลบเฉพาะ "แถวความเชื่อมโยง" นี้แถวเดียว ──────────
+        // (ไม่แตะข้อมูลต้นทางในตารางที่ 1 เพราะมักถูกใช้ร่วมกันหลายความเชื่อมโยง)
+        const linksCol = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('strat_links');
         this.showLoader();
-        const docSnap = await this.getAdminColRef(row._col).doc(row._realId).get();
-        if (docSnap.exists) {
-            const d = docSnap.data();
-            if (row._col === 'strat_kpis') {
-                if (d.type === 'kpi') {
-                    chainIds.kpiItemId = row._realId;
-                    chainIds.kpiDimId  = d.bscId || '';
-                } else {
-                    chainIds.kpiDimId = row._realId;
-                }
-                chainIds.subStratId  = chainIds.subStratId  || d.subStrategyId || '';
-                chainIds.dimId       = chainIds.dimId       || d.bscId || d.dimId || '';
-                chainIds.strategyId  = chainIds.strategyId  || d.strategyId || '';
-                chainIds.issueId     = chainIds.issueId     || d.issueId || '';
-                chainIds.planId      = chainIds.planId      || d.planId || '';
-            } else if (row._col === 'strat_sub_strategies') {
-                chainIds.subStratId = row._realId;
-                chainIds.dimId      = chainIds.dimId     || d.dimId || '';
-                chainIds.strategyId = chainIds.strategyId|| d.strategyId || '';
-                chainIds.issueId    = chainIds.issueId   || d.issueId || '';
-                chainIds.planId     = chainIds.planId    || d.planId || '';
-            } else if (row._col === 'strat_dimensions') {
-                chainIds.dimId      = row._realId;
-                chainIds.strategyId = chainIds.strategyId || d.strategyId || '';
-                chainIds.issueId    = chainIds.issueId   || d.issueId || '';
-                chainIds.planId     = chainIds.planId    || d.planId || '';
-            } else if (row._col === 'strat_strategies') {
-                chainIds.strategyId = row._realId;
-                chainIds.issueId    = chainIds.issueId || d.issueId || '';
-                chainIds.planId     = chainIds.planId  || d.planId || '';
-            } else if (row._col === 'strat_issues') {
-                chainIds.issueId = row._realId;
-                chainIds.planId  = chainIds.planId || d.planId || '';
-            } else if (row._col === 'strat_plans') {
-                chainIds.planId = row._realId;
-            }
-        }
+        const linkSnap = await linksCol.doc(id).get();
+        if (!linkSnap.exists) { this.hideLoader(); alert('ไม่พบข้อมูล (อาจถูกลบไปแล้ว)'); await this.refreshAdminStratLinks(); return; }
+        const link = linkSnap.data();
 
-        // check if any form4 doc references IDs in this chain
+        // เช็คว่า ง.4 / ง.6 ที่ "บันทึกจริง" อ้างอิงถึงความเชื่อมโยงชุดนี้ (ครบ issue+strategy+dimension) หรือยัง
         const form4Col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('form4');
-        const refFields = [
-            { field: 'plan',      id: chainIds.planId },
-            { field: 'issue',     id: chainIds.issueId },
-            { field: 'strategy',  id: chainIds.strategyId },
-            { field: 'dimension', id: chainIds.dimId },
-        ];
+        const ng6Col   = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('requests_ng6');
         let isUsed = false;
-        for (const ref of refFields) {
-            if (!ref.id) continue;
-            const chk = await form4Col.where(ref.field, '==', ref.id).limit(1).get();
-            if (!chk.empty) { isUsed = true; break; }
+        if (link.issueId && link.strategyId && link.dimId) {
+            const chk4 = await form4Col
+                .where('issue', '==', link.issueId)
+                .where('strategy', '==', link.strategyId)
+                .where('dimension', '==', link.dimId)
+                .limit(1).get();
+            if (!chk4.empty) isUsed = true;
+        }
+        if (!isUsed && link.issueId && link.strategyId && link.dimId) {
+            const chk6 = await ng6Col
+                .where('detail.stratIssueId', '==', link.issueId)
+                .where('detail.stratStrategyId', '==', link.strategyId)
+                .where('detail.stratDimensionId', '==', link.dimId)
+                .limit(1).get().catch(() => ({ empty: true })); // เผื่อ index ยังไม่พร้อม ไม่ block การลบ
+            if (!chk6.empty) isUsed = true;
         }
 
         this.hideLoader();
 
         if (isUsed) {
-            alert('⚠️ มีการใช้ข้อมูลในการเชื่อมโยงในส่วนอื่นๆ\nหากลบจะทำให้ข้อมูลหาย\nไม่สามารถลบได้');
+            alert('⚠️ มีการใช้ความเชื่อมโยงนี้ในแบบฟอร์มที่บันทึกไว้แล้ว (ง.4/ง.6)\nหากต้องการลบ กรุณาตรวจสอบและแก้ไขแบบฟอร์มที่เกี่ยวข้องก่อน');
             return;
         }
 
-        const ok = confirm('ยืนยันลบข้อมูลแถวนี้ทั้งหมด?');
+        const ok = confirm('ยืนยันลบความเชื่อมโยงแถวนี้?');
         if (!ok) return;
 
-        // delete entire chain for this row
         this.showLoader();
-        const dataRoot = db.collection('artifacts').doc(appId).collection('public').doc('data');
-        const batch = db.batch();
-
-        const safeDelete = (col, docId) => {
-            if (docId) batch.delete(dataRoot.collection(col).doc(docId));
-        };
-
-        safeDelete('strat_kpis',           chainIds.kpiItemId);
-        safeDelete('strat_kpis',           chainIds.kpiDimId);
-        safeDelete('strat_sub_strategies', chainIds.subStratId);
-        safeDelete('strat_dimensions',     chainIds.dimId);
-        safeDelete('strat_strategies',     chainIds.strategyId);
-        safeDelete('strat_issues',         chainIds.issueId);
-        safeDelete('strat_plans',          chainIds.planId);
-
-        await batch.commit();
+        await linksCol.doc(id).delete();
         await this.refreshAdminStratLinks();
-        this.adminResetStratLinkingUI();
         this.renderAdminTable('strat_links');
 
     } catch (e) {
@@ -2940,7 +2882,7 @@ async fillDeptSelectForBranches() {
             this.showLoader();
 
             const [depts, branches, years, issues, strategies, dimensions, units,
-                   budgetTypes, plans, kpiPlan13Master, kpiProjectMaster] = await Promise.all([
+                   budgetTypes, plans, kpis] = await Promise.all([
                 getCol('depts').orderBy('name').get(),
                 getCol('branches').orderBy('name').get().catch(() => ({ docs: [] })),
                 getCol('years').orderBy('name').get().catch(() => ({ docs: [] })),
@@ -2950,24 +2892,31 @@ async fillDeptSelectForBranches() {
                 getCol('units').orderBy('name').get().catch(() => ({ docs: [] })),
                 getCol('budget_types').orderBy('name').get().catch(() => ({ docs: [] })),
                 getCol('strat_plans').orderBy('name').get().catch(() => ({ docs: [] })),
-                getCol('kpi_master_plan13').orderBy('name').get().catch(() => ({ docs: [] })),
-                getCol('kpi_master_project').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('strat_kpis').orderBy('name').get().catch(() => ({ docs: [] })),
             ]);
 
             const mapDocs = (snap) => (snap?.docs || []).map(d => ({ id: d.id, ...d.data() }));
 
+            // ตัวชี้วัด (strat_kpis type='kpi') — ชุดเดียวกับ ง.4 ข้อ 7 — เอาแค่รายชื่อ ไม่ซ้ำ (ตัวชี้วัดอาจผูกหลายมิติ ชื่อซ้ำได้)
+            const allKpis = mapDocs(kpis).filter(k => k.type === 'kpi');
+            const seenKpiName = new Set();
+            const kpiNameList = [];
+            allKpis.forEach(k => {
+                const nm = (k.name || '').trim();
+                if (nm && !seenKpiName.has(nm)) { seenKpiName.add(nm); kpiNameList.push({ id: nm, name: nm }); }
+            });
+
             const cache = this._f6cache = {
-                depts:           mapDocs(depts),
-                branches:        mapDocs(branches),
-                years:           mapDocs(years),
-                issues:          mapDocs(issues),
-                strategies:      mapDocs(strategies),
-                dimensions:      mapDocs(dimensions),
-                units:           mapDocs(units),
-                budgetTypes:     mapDocs(budgetTypes),
-                plans:           mapDocs(plans),
-                kpiPlan13Master: mapDocs(kpiPlan13Master),
-                kpiProjectMaster: mapDocs(kpiProjectMaster),
+                depts:       mapDocs(depts),
+                branches:    mapDocs(branches),
+                years:       mapDocs(years),
+                issues:      mapDocs(issues),
+                strategies:  mapDocs(strategies),
+                dimensions:  mapDocs(dimensions),
+                units:       mapDocs(units),
+                budgetTypes: mapDocs(budgetTypes),
+                plans:       mapDocs(plans),
+                kpiNameList: kpiNameList,
             };
 
             setOptions(document.getElementById('f6-dept'),          cache.depts);
@@ -3144,29 +3093,20 @@ async fillDeptSelectForBranches() {
     },
 
     /* ---------- SECTION K: ตัวชี้วัด (dynamic แถว, ใช้ร่วม 21.1/21.2) ---------- */
-    // mapping: groupKey ('plan13' | 'project') -> Firestore collection ของ master list ตัวชี้วัดตั้งต้น
-    _f6KpiMasterCol(groupKey) {
-        return groupKey === 'plan13' ? 'kpi_master_plan13' : 'kpi_master_project';
-    },
-    _f6KpiMasterCacheKey(groupKey) {
-        return groupKey === 'plan13' ? 'kpiPlan13Master' : 'kpiProjectMaster';
-    },
-
+    // ใช้ชุดตัวชี้วัดเดียวกันทั้ง 21.1 และ 21.2 — ดึงจาก strat_kpis (type='kpi') ชุดเดียวกับ ง.4 ข้อ 7
     f6AddKpiRow(groupKey) {
         const body = document.getElementById(`f6-kpi-${groupKey}-rows`);
         if (!body) return;
         const units = (this._f6cache?.units || []);
-        const cacheKey = this._f6KpiMasterCacheKey(groupKey);
-        const kpiOptions = this.f4SortByName(this._f6cache?.[cacheKey] || []);
+        const kpiOptions = this._f6cache?.kpiNameList || [];
         const rid = `kpi-${groupKey}-${Date.now()}-${Math.floor(Math.random()*1000)}`;
         const tr = document.createElement('tr');
         tr.dataset.rid = rid;
         tr.innerHTML = `
             <td class="px-3 py-2">
-                <select class="input-flat w-full bg-white text-xs f6-kpi-label" data-group="${groupKey}" onchange="App.f6OnKpiLabelChange(this)">
-                    <option value="">— เลือกตัวชี้วัด —</option>
+                <select class="input-flat w-full bg-white text-xs f6-kpi-label">
+                    <option value="">${kpiOptions.length ? '— เลือกตัวชี้วัด —' : '— ยังไม่มีข้อมูลตัวชี้วัด —'}</option>
                     ${kpiOptions.map(k => `<option value="${k.name}">${k.name}</option>`).join('')}
-                    <option value="__add_new__">+ เพิ่มรายการใหม่...</option>
                 </select>
             </td>
             <td class="px-3 py-2">
@@ -3179,58 +3119,6 @@ async fillDeptSelectForBranches() {
             <td class="px-2 py-2 no-print"><button onclick="App.f6RemoveRow('f6-kpi-${groupKey}-rows','${rid}')" class="text-red-400 hover:text-red-600"><i data-lucide="x" size="14"></i></button></td>`;
         body.appendChild(tr);
         lucide.createIcons();
-    },
-
-    // เมื่อเลือก "+ เพิ่มรายการใหม่..." ใน dropdown ตัวชี้วัด ให้ถาม prompt แล้วบันทึกลง master list ทันที
-    async f6OnKpiLabelChange(selectEl) {
-        if (!selectEl || selectEl.value !== '__add_new__') return;
-        const groupKey = selectEl.dataset.group;
-        const name = (prompt('ระบุชื่อตัวชี้วัดใหม่:') || '').trim();
-        if (!name) { selectEl.value = ''; return; }
-
-        try {
-            this.showLoader();
-            const col = this._f6KpiMasterCol(groupKey);
-            const cacheKey = this._f6KpiMasterCacheKey(groupKey);
-            const colRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
-
-            // กันชื่อซ้ำ: ถ้ามีอยู่แล้วใน cache ไม่ต้องเขียนซ้ำ
-            const cache = this._f6cache || (this._f6cache = {});
-            if (!cache[cacheKey]) cache[cacheKey] = [];
-            const existing = cache[cacheKey].find(k => (k.name || '').trim() === name);
-
-            let newItem = existing;
-            if (!existing) {
-                const ref = await colRef.add({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser?.name || '' });
-                newItem = { id: ref.id, name };
-                cache[cacheKey].push(newItem);
-            }
-
-            // เติม option ใหม่ใน select ตัวนี้ (ก่อน option "+ เพิ่มรายการใหม่...") แล้วเลือกให้ทันที
-            const addNewOpt = Array.from(selectEl.options).find(o => o.value === '__add_new__');
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
-            if (addNewOpt) selectEl.insertBefore(opt, addNewOpt); else selectEl.appendChild(opt);
-            selectEl.value = name;
-
-            // เติม option ใหม่ใน select ตัวชี้วัดแถวอื่นๆ ของกลุ่มเดียวกัน เพื่อให้เลือกได้ทันทีโดยไม่ต้องรีโหลดหน้า
-            document.querySelectorAll(`.f6-kpi-label[data-group="${groupKey}"]`).forEach(sel => {
-                if (sel === selectEl) return;
-                if (Array.from(sel.options).some(o => o.value === name)) return;
-                const addNewOpt2 = Array.from(sel.options).find(o => o.value === '__add_new__');
-                const opt2 = document.createElement('option');
-                opt2.value = name;
-                opt2.textContent = name;
-                if (addNewOpt2) sel.insertBefore(opt2, addNewOpt2); else sel.appendChild(opt2);
-            });
-        } catch (e) {
-            console.error('f6OnKpiLabelChange error', e);
-            alert('บันทึกตัวชี้วัดใหม่ไม่สำเร็จ');
-            selectEl.value = '';
-        } finally {
-            this.hideLoader();
-        }
     },
 
     /* ---------- ตัวช่วยลบแถวทั่วไป ---------- */
@@ -3617,13 +3505,13 @@ async fillDeptSelectForBranches() {
                     if (last) {
                         const labelSel = last.querySelector('.f6-kpi-label');
                         const label = r.label || '';
+                        // ถ้าตัวชี้วัดที่เคยบันทึกไว้ไม่อยู่ใน list ปัจจุบันแล้ว (ถูกลบ/เปลี่ยนชื่อ) ให้เติม option ชั่วคราวกันข้อมูลหาย
                         if (labelSel && label) {
                             const hasOpt = Array.from(labelSel.options).some(o => o.value === label);
                             if (!hasOpt) {
-                                const addNewOpt = Array.from(labelSel.options).find(o => o.value === '__add_new__');
                                 const opt = document.createElement('option');
                                 opt.value = label; opt.textContent = label;
-                                if (addNewOpt) labelSel.insertBefore(opt, addNewOpt); else labelSel.appendChild(opt);
+                                labelSel.appendChild(opt);
                             }
                             labelSel.value = label;
                         }
