@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;600;700&display=swap');
 
-* { font-family: 'Anuphan', sans-serif; transition: all 0.2s ease; }
+* { font-family: 'Anuphan', sans-serif; }
+
+/* transition เฉพาะ element ที่ต้องการ ไม่ใช่ทั้งหมด */
+button, a, .menu-active, .card-main { transition: background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease; }
 
 body { background-color: #ede9fe; }
 
@@ -15,7 +18,15 @@ body { background-color: #ede9fe; }
 .input-flat { background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 0.75rem 1rem; border-radius: 0.85rem; font-size: 0.875rem; outline: none; }
 .input-flat:focus { border-color: #7c3aed; background: #ffffff; box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.05); }
 
-.table-header { background: #f1f5f9; color: #64748b; font-weight: bold; text-transform: uppercase; font-size: 0.7rem; }
+.table-header { background: #ede9fe; color: #5b21b6; font-weight: 700; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.04em; }
+
+/* ตัวอักษรในตาราง — บางเบา */
+tbody td { font-weight: 300; color: #374151; }
+
+/* สลับสีแถว เข้ม/อ่อน */
+tbody tr:nth-child(odd)  { background-color: #faf9ff; }
+tbody tr:nth-child(even) { background-color: #f3f0ff; }
+tbody tr:hover { background-color: #ede9fe !important; }
 
 /* ===== (ง.4) placeholder + layout helpers ===== */
 input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }

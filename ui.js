@@ -1162,7 +1162,7 @@ const UI = {
             <button onclick="App.stratT1Next()" title="ถัดไป"  class="w-9 h-9 rounded-xl border border-purple-100 bg-white hover:bg-purple-50 flex items-center justify-center text-purple-600 shadow-sm"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
         </div>
     </div>
-    <div id="strat-t1-p1">${this.adminTableBlock('ฉบับแผนพัฒนามหาวิทยาลัย','strat_plans',['ลำดับ','ชื่อฉบับแผน','วันที่บันทึก'])}</div>
+    <div id="strat-t1-p1">${this.adminTableBlock('ฉบับแผนพัฒนามหาวิทยาลัย','strat_plans',['ลำดับ','ชื่อฉบับแผน','สถานะ','วันที่บันทึก'])}</div>
     <div id="strat-t1-p2" class="hidden">${this.adminTableBlock('ประเด็นยุทธศาสตร์','strat_issues',['ลำดับ','ชื่อประเด็นยุทธศาสตร์','วันที่บันทึก'])}</div>
     <div id="strat-t1-p3" class="hidden">${this.adminTableBlock('วัตถุประสงค์เชิงยุทธศาสตร์','strat_strategies',['ลำดับ','ชื่อวัตถุประสงค์เชิงยุทธศาสตร์','วันที่บันทึก'])}</div>
     <div id="strat-t1-p4" class="hidden">${this.adminTableBlock('กลยุทธ์','strat_dimensions',['ลำดับ','ชื่อกลยุทธ์','วันที่บันทึก'])}</div>
@@ -1341,15 +1341,15 @@ adminMiniTableBlock(title, key, headers) {
                     </div>
                 </div>
 
-                <!-- แถว 4: แหล่งเงินงบประมาณ | อื่นๆ (เต็มแถว) -->
-                <div class="grid grid-cols-[1fr_1fr] divide-x divide-gray-100 bg-indigo-50/20 border-t border-gray-100">
+                <!-- แถว 4: แหล่งงบประมาณ -->
+                <div class="grid grid-cols-1 bg-indigo-50/20 border-t border-gray-100">
                     <div class="f4-cell">
-                        <label class="f4-cell-label">3. แหล่งเงินงบประมาณ <span class="text-red-500">*</span></label>
-                        <select id="f6-budget-source" class="f4-cell-input"></select>
-                    </div>
-                    <div class="f4-cell">
-                        <label class="f4-cell-label text-gray-400">อื่นๆ โปรดระบุ</label>
-                        <input id="f6-budget-other" placeholder="โปรดระบุ (กรณีเลือกอื่นๆ)" class="f4-cell-input">
+                        <label class="f4-cell-label">3. แหล่งงบประมาณ <span class="text-red-500">*</span></label>
+                        <div class="space-y-2 mt-1">
+                            <label class="flex items-center gap-3 text-sm"><input type="radio" name="f6-budget-src" value="แผ่นดิน" class="accent-indigo-600" onchange="App.f6ToggleBudgetSrc()"><span>งบประมาณรายจ่ายประจำปีงบประมาณ พ.ศ. <input id="f6-budget-src-y1" class="input-flat inline-block w-28 ml-1 py-1 px-2 text-xs" placeholder="พ.ศ...."></span></label>
+                            <label class="flex items-center gap-3 text-sm"><input type="radio" name="f6-budget-src" value="รายได้" class="accent-indigo-600" onchange="App.f6ToggleBudgetSrc()"><span>งบประมาณเงินรายได้ประจำปีงบประมาณ พ.ศ. <input id="f6-budget-src-y2" class="input-flat inline-block w-28 ml-1 py-1 px-2 text-xs" placeholder="พ.ศ...."></span></label>
+                            <label class="flex items-center gap-3 text-sm"><input type="radio" name="f6-budget-src" value="อื่นๆ" class="accent-indigo-600" onchange="App.f6ToggleBudgetSrc()"><span>งบประมาณอื่นๆ โปรดระบุ <input id="f6-budget-src-other" class="input-flat inline-block w-48 ml-1 py-1 px-2 text-xs" placeholder="ระบุ..."></span></label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1688,12 +1688,8 @@ adminMiniTableBlock(title, key, headers) {
                         <div class="font-bold text-sm">21.1 สอดคล้องกับตัวชี้วัดความสำเร็จตามแผนพัฒนามหาวิทยาลัยฯ ฉบับที่ 13 (พ.ศ. 2566 – 2570)</div>
                         <button onclick="App.f6AddKpiRow('plan13')" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 no-print"><i data-lucide="plus" size="13"></i> เพิ่มแถว</button>
                     </div>
-                    <div class="f4-cell !p-0">
-                        <label class="f4-cell-label">ฉบับแผนพัฒนามหาวิทยาลัย</label>
-                        <select id="f6-plan13-plan" class="f4-cell-input bg-gray-50"></select>
-                    </div>
                     <div class="overflow-auto">
-                        <table class="w-full text-left text-xs min-w-[560px]">
+                        <table class="w-full text-left text-xs min-w-[500px]">
                             <thead class="table-header"><tr class="bg-indigo-50/40"><th class="px-3 py-2">ตัวชี้วัดตามแผนพัฒนามหาวิทยาลัยฯ</th><th class="px-3 py-2 w-32">หน่วยนับ</th><th class="px-3 py-2 w-28">จำนวน</th><th class="w-10 no-print"></th></tr></thead>
                             <tbody id="f6-kpi-plan13-rows" class="divide-y divide-gray-100"></tbody>
                         </table>
@@ -1707,7 +1703,7 @@ adminMiniTableBlock(title, key, headers) {
                         <button onclick="App.f6AddKpiRow('project')" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 no-print"><i data-lucide="plus" size="13"></i> เพิ่มแถว</button>
                     </div>
                     <div class="overflow-auto">
-                        <table class="w-full text-left text-xs min-w-[560px]">
+                        <table class="w-full text-left text-xs min-w-[500px]">
                             <thead class="table-header"><tr class="bg-indigo-50/40"><th class="px-3 py-2">ตัวชี้วัดโครงการ</th><th class="px-3 py-2 w-32">หน่วยนับ</th><th class="px-3 py-2 w-28">จำนวน</th><th class="w-10 no-print"></th></tr></thead>
                             <tbody id="f6-kpi-project-rows" class="divide-y divide-gray-100"></tbody>
                         </table>
