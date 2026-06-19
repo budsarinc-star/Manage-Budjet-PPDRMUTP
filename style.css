@@ -37,6 +37,15 @@ select option[value=""] { color: #9ca3af; }
 .print-only { display: none; }
 .form4-print-code { position: absolute; top: 18px; right: 18px; font-weight: 800; font-size: 12px; color: #111827; }
 
+/* ── ลายเซ็น 3 คน (ซ่อนบนจอ แสดงตอนพิมพ์) ── */
+.print-signature-block { display: none; }
+.print-signature-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 0 40px; margin-top: 40px; }
+.print-signature-col { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.print-signature-line { width: 100%; border-top: 1px solid #111; margin-bottom: 8px; height: 56px; }
+.print-signature-name { font-size: 13px; font-weight: 700; color: #111; margin-bottom: 2px; }
+.print-signature-title { font-size: 12px; color: #111; margin-bottom: 4px; }
+.print-signature-date { font-size: 11px; color: #555; }
+
 .f4-short { max-width: 420px; }
 .f4-long { width: 100%; }
 
@@ -53,10 +62,26 @@ select option[value=""] { color: #9ca3af; }
 .date-cell { font-size: 12px; }
 
 @media print {
+    /* ── ซ่อนทุกอย่างที่ไม่เกี่ยวกับฟอร์ม ── */
     .no-print { display: none !important; }
-    main { margin: 0; padding: 0; background: white; }
+
+    /* ── reset layout ── */
+    body { overflow: visible !important; background: white !important; }
+    #main-app { display: block !important; height: auto !important; overflow: visible !important; }
+    aside { display: none !important; }
+    main {
+        margin: 0 !important; padding: 0 !important;
+        background: white !important;
+        overflow: visible !important;
+        height: auto !important;
+        width: 100% !important;
+        flex: none !important;
+    }
+    #content-view { padding: 0 !important; overflow: visible !important; height: auto !important; }
+
     .card-main { border-radius: 0; border: none; box-shadow: none; }
     .print-only { display: block !important; }
+    .print-signature-block { display: block !important; page-break-inside: avoid; }
     .form4-print-code { position: fixed; top: 12mm; right: 12mm; }
     .f4-inline-label { min-width: 105px; }
     .f4-note { margin-left: calc(105px + 0.75rem); }

@@ -101,6 +101,7 @@ const App = {
         } else if (page === 'manage') {
             view.innerHTML = UI.managePage(subId);
             if (subId === 'tab1') this.initManageForm4();
+            if (subId === 'tab2') this.initManageForm5();
             if (subId === 'tab3') this.initManageForm6();
         }
         lucide.createIcons();
@@ -216,7 +217,9 @@ const App = {
 
             // populate dropdowns ที่ไม่ต้อง cascade
             setOptions(document.getElementById('f-dept'),          cache.depts);
-            setOptions(document.getElementById('f-branch'),        cache.branches);
+            // สาขา/งาน: รีเซ็ตรอให้ผู้ใช้เลือก dept ก่อน
+            const f4BranchEl = document.getElementById('f-branch');
+            if (f4BranchEl) f4BranchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
             setOptions(document.getElementById('f-budget-source'), cache.budgetSources);
             setOptions(document.getElementById('f-item'),          cache.items);
             setOptions(document.getElementById('f-category'),      cache.categories);
@@ -441,6 +444,20 @@ const App = {
         }
         // ถ้าเลขนำหน้าเท่ากันหมด (หรือไม่มีเลขเลยทั้งคู่) ให้ fallback เรียงตามชื่อแบบ locale compare
         return nameA.localeCompare(nameB, 'th');
+    },
+
+    f4LoadBranches() {
+        const deptEl = document.getElementById('f-dept');
+        const branchEl = document.getElementById('f-branch');
+        if (!deptEl || !branchEl) return;
+        const deptId = deptEl.value;
+        if (!deptId) {
+            branchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
+            return;
+        }
+        const branches = (this._f4cache?.branches || []).filter(b => b.deptId === deptId);
+        branchEl.innerHTML = `<option value="">${branches.length ? '— เลือกสาขา/งาน —' : '— ไม่มีสาขา/งานในหน่วยงานนี้ —'}</option>` +
+            branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
     },
 
     f4SortByName(items) {
@@ -782,6 +799,578 @@ const App = {
         } finally {
             this.hideLoader();
         }
+    },
+
+    // ══════════════════════════════════════════════════════════════
+    // FORM 5 (ง.5) Functions
+    // ══════════════════════════════════════════════════════════════
+
+    async initManageForm5() {
+        if (!document.getElementById('f5-year')) return;
+        try {
+            if (!this._f4cache) await this.initManageForm4();
+            this.f5InitDropdowns();
+            await this.loadForm5Records();
+        } catch(e) { console.error('initManageForm5 error', e); }
+    },
+
+    async f5LoadBranches() {
+        const deptEl = document.getElementById('f5-dept');
+        const branchEl = document.getElementById('f5-branch');
+        if (!deptEl || !branchEl) return;
+        const deptId = deptEl.value;
+        if (!deptId) { branchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>'; return; }
+        const branches = (this._f4cache?.branches || []).filter(b => b.deptId === deptId);
+        branchEl.innerHTML = `<option value="">${branches.length ? '— เลือกสาขา/งาน —' : '— ไม่มีสาขา/งานในหน่วยงานนี้ —'}</option>` +
+            branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    },
+
+    f5InitDropdowns() {
+        const cache = this._f4cache;
+        const setOpts = (el, items) => {
+            if (!el) return;
+            const ph = el.options[0]?.value === '' ? el.options[0].text : '— เลือก —';
+            el.innerHTML = `<option value="">${ph}</option>` +
+                (items || []).map(x => `<option value="${x.id}">${x.name||x.id}</option>`).join('');
+        };
+        setOpts(document.getElementById('f5-year'), cache?.years);
+        setOpts(document.getElementById('f5-dept'), cache?.depts);
+        const branchEl = document.getElementById('f5-branch');
+        if (branchEl) branchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
+        const body = document.getElementById('f5-construct-body');
+        if (body && body.children.length === 0) { for(let i=0;i<3;i++) this.f5AddConstructRow(); }
+        const kpiBody = document.getElementById('f5-kpi-plan-body');
+        if (kpiBody && kpiBody.children.length === 0) this.f5AddKpiRow();
+        this._f5MultiOptions = this._f5MultiOptions || {};
+        this.f5InitStratDropdowns();
+    },
+
+    f5InitStratDropdowns() {
+        const cache = this._f4cache;
+        const issueEl = document.getElementById('f5-issue');
+        if (!issueEl) return;
+        if (!cache) { this.initManageForm4().then(() => this.f5InitStratDropdowns()).catch(()=>{}); return; }
+        const links = cache.stratLinks || [];
+        // รวม issues ทั้งหมดจาก strat_links (dedup)
+        const seen = new Set();
+        const issues = links
+            .filter(l => l.issueId && !seen.has(l.issueId) && seen.add(l.issueId))
+            .map(l => ({ id: l.issueId, name: l.issueName || l.issueId }));
+        issueEl.disabled = false;
+        issueEl.innerHTML = `<option value="">— เลือกประเด็นยุทธศาสตร์ —</option>` +
+            this.f4SortByName(issues).map(x => `<option value="${x.id}">${x.name}</option>`).join('');
+        issueEl.classList.add('f4-placeholder');
+        issueEl.addEventListener('change', () => issueEl.value ? issueEl.classList.remove('f4-placeholder') : issueEl.classList.add('f4-placeholder'));
+        // reset downstream
+        ['f5-strategy','f5-dimension','f5-kpidim'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.disabled = true; el.innerHTML = '<option value="">— เลือกขั้นตอนก่อนหน้า —</option>'; el.classList.add('f4-placeholder'); }
+        });
+    },
+
+    // Cascade สำหรับ Form5 Section B (ประเด็น → วัตถุประสงค์ → กลยุทธ์ → มิติ)
+    f5StratCascade(step) {
+        const cache = this._f4cache;
+        if (!cache) return;
+        const links = cache.stratLinks || [];
+        const val = id => document.getElementById(id)?.value || '';
+        const fill = (id, items, placeholder) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const seen = new Set();
+            const uniq = items.filter(x => x.id && !seen.has(x.id) && seen.add(x.id));
+            el.disabled = uniq.length === 0;
+            el.innerHTML = `<option value="">${uniq.length ? placeholder : '— ไม่มีข้อมูล —'}</option>` +
+                this.f4SortByName(uniq).map(x => `<option value="${x.id}">${x.name||x.id}</option>`).join('');
+            if (!el.value) el.classList.add('f4-placeholder');
+            el.addEventListener('change', () => el.value ? el.classList.remove('f4-placeholder') : el.classList.add('f4-placeholder'));
+        };
+        const lock = (id, ph) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.disabled = true; el.innerHTML = `<option value="">${ph}</option>`; el.classList.add('f4-placeholder');
+        };
+
+        if (step === 'issue') {
+            const issueId = val('f5-issue');
+            const strats = issueId ? links.filter(l => l.issueId === issueId) : [];
+            const seenS = new Set();
+            fill('f5-strategy',
+                strats.filter(l => l.strategyId && !seenS.has(l.strategyId) && seenS.add(l.strategyId))
+                      .map(l => ({ id: l.strategyId, name: l.strategyName || l.strategyId })),
+                '— เลือกวัตถุประสงค์เชิงยุทธศาสตร์ —');
+            lock('f5-dimension', '— เลือกวัตถุประสงค์ก่อน —');
+            lock('f5-kpidim', '— เลือกกลยุทธ์ก่อน —');
+        } else if (step === 'strategy') {
+            const issueId = val('f5-issue'), strategyId = val('f5-strategy');
+            const dims = strategyId ? links.filter(l => l.issueId === issueId && l.strategyId === strategyId) : [];
+            const seenD = new Set();
+            fill('f5-dimension',
+                dims.filter(l => l.dimId && !seenD.has(l.dimId) && seenD.add(l.dimId))
+                    .map(l => ({ id: l.dimId, name: l.dimName || l.dimId })),
+                '— เลือกกลยุทธ์ —');
+            lock('f5-kpidim', '— เลือกกลยุทธ์ก่อน —');
+        } else if (step === 'dimension') {
+            const issueId = val('f5-issue'), strategyId = val('f5-strategy'), dimId = val('f5-dimension');
+            const kpiDims = dimId ? links.filter(l => l.issueId === issueId && l.strategyId === strategyId && l.dimId === dimId) : [];
+            const seenK = new Set();
+            fill('f5-kpidim',
+                kpiDims.filter(l => l.kpiDimId && !seenK.has(l.kpiDimId) && seenK.add(l.kpiDimId))
+                       .map(l => ({ id: l.kpiDimId, name: l.kpiDimName || l.kpiDimId })),
+                '— เลือกมิติ —');
+        }
+    },
+
+    f5GetMultiValues(step) {
+        const cid = step === 'kpi' ? 'f5-kpi-multi-rows' : `f5-${step}-rows`;
+        const c = document.getElementById(cid);
+        if (!c) return [];
+        return Array.from(c.querySelectorAll('select')).map(s => s.value).filter(Boolean);
+    },
+
+    f5RenderMultiRows(step, options, placeholder, onChangeStep) {
+        const cid = step === 'kpi' ? 'f5-kpi-multi-rows' : `f5-${step}-rows`;
+        const c = document.getElementById(cid);
+        if (!c) return;
+        this._f5MultiOptions = this._f5MultiOptions || {};
+        this._f5MultiOptions[step] = options || [];
+        const prev = this.f5GetMultiValues(step);
+        const hasData = (options || []).length > 0;
+        const buildOpts = (sel) => `<option value="">${hasData ? placeholder : '— ไม่มีข้อมูล —'}</option>` +
+            (options || []).map(o => `<option value="${o.id}"${o.id === sel ? ' selected' : ''}>${o.name}</option>`).join('');
+        let keep = prev.filter(v => (options || []).some(o => o.id === v));
+        if (!keep.length) keep = [''];
+        c.innerHTML = keep.map(v => `<select class="f4-strat-select f4-multi-select" data-step="${step}" ${hasData ? '' : 'disabled'} onchange="App.f5OnMultiChange('${step}','${onChangeStep||''}')">${buildOpts(v)}</select>`).join('');
+        c.querySelectorAll('select').forEach(s => { if (!s.value) s.classList.add('f4-placeholder'); else s.classList.remove('f4-placeholder'); });
+    },
+
+    f5AddMultiRow(step) {
+        const cid = step === 'kpi' ? 'f5-kpi-multi-rows' : `f5-${step}-rows`;
+        const c = document.getElementById(cid);
+        if (!c) return;
+        this._f5MultiOptions = this._f5MultiOptions || {};
+        const opts = this._f5MultiOptions[step] || [];
+        if (!opts.length) return alert('ยังไม่มีข้อมูลให้เลือกเพิ่ม กรุณาเลือกขั้นตอนก่อนหน้าให้ครบก่อน');
+        const ocs = step === 'dimension' ? 'dimension' : (step === 'substrategy' ? 'substrategy' : '');
+        const sel = document.createElement('select');
+        sel.className = 'f4-strat-select f4-multi-select f4-placeholder';
+        sel.dataset.step = step;
+        sel.setAttribute('onchange', `App.f5OnMultiChange('${step}','${ocs}')`);
+        sel.innerHTML = `<option value="">เลือก...</option>` + opts.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+        c.appendChild(sel);
+        if (window.lucide) lucide.createIcons();
+    },
+
+    f5RemoveMultiRow(step) {
+        const cid = step === 'kpi' ? 'f5-kpi-multi-rows' : `f5-${step}-rows`;
+        const c = document.getElementById(cid);
+        if (!c) return;
+        const rows = c.querySelectorAll('select');
+        if (rows.length <= 1) { rows[0] && (rows[0].value = ''); }
+        else rows[rows.length - 1].remove();
+        if (step === 'dimension') this.f5CascadeStep('dimension');
+        else if (step === 'substrategy') this.f5CascadeStep('substrategy');
+    },
+
+    f5OnMultiChange(step, onChangeStep) {
+        const cid = step === 'kpi' ? 'f5-kpi-multi-rows' : `f5-${step}-rows`;
+        document.querySelectorAll(`#${cid} select`).forEach(s => {
+            if (!s.value) s.classList.add('f4-placeholder'); else s.classList.remove('f4-placeholder');
+        });
+        if (onChangeStep) this.f5CascadeStep(onChangeStep);
+    },
+
+    f5CascadeStep(step) {
+        const cache = this._f4cache;
+        if (!cache) return;
+        const links = cache.stratLinks || [];
+        const val = id => document.getElementById(id)?.value || '';
+        const lock = (id, ph) => { const el = document.getElementById(id); if (!el) return; el.disabled = true; el.innerHTML = `<option value="">${ph}</option>`; el.classList.add('f4-placeholder'); };
+        const fill = (id, items, ph) => {
+            const el = document.getElementById(id); if (!el) return;
+            const seen = new Set(); const uniq = items.filter(x => x.id && !seen.has(x.id) && seen.add(x.id));
+            el.disabled = uniq.length === 0;
+            el.innerHTML = `<option value="">${uniq.length ? ph : '— ไม่มีข้อมูล —'}</option>` + uniq.map(x => `<option value="${x.id}">${x.name||x.id}</option>`).join('');
+            if (!el.value) el.classList.add('f4-placeholder');
+            el.addEventListener('change', () => el.value ? el.classList.remove('f4-placeholder') : el.classList.add('f4-placeholder'));
+        };
+        const fl = (fn, iF, nF) => this.fromLinks(links, fn, iF, nF);
+        const sor = (sf, rf, iF, nF) => { const s = fl(sf, iF, nF); return s.length ? s : fl(rf, iF, nF); };
+        const lm = (s) => this.f5RenderMultiRows(s, [], '— เลือกขั้นตอนก่อนหน้า —');
+        if (step === 'plan') {
+            const planId = val('f5-plan');
+            fill('f5-issue', planId ? fl(l => l.planId === planId, 'issueId', 'issueName') : [], '— เลือกประเด็นยุทธศาสตร์ —');
+            lock('f5-strategy','— เลือกประเด็นก่อน —'); lm('dimension'); lm('substrategy'); lock('f5-kpidim','— เลือกกลยุทธ์ก่อน —'); lm('kpi');
+        } else if (step === 'issue') {
+            const planId = val('f5-plan'), issueId = val('f5-issue');
+            fill('f5-strategy', issueId ? sor(l => l.planId===planId && l.issueId===issueId, l => l.issueId===issueId, 'strategyId','strategyName') : [], '— เลือกวัตถุประสงค์เชิงยุทธศาสตร์ —');
+            lm('dimension'); lm('substrategy'); lock('f5-kpidim','— เลือกกลยุทธ์ก่อน —'); lm('kpi');
+        } else if (step === 'strategy') {
+            const planId = val('f5-plan'), issueId = val('f5-issue'), strategyId = val('f5-strategy');
+            const dims = strategyId ? sor(l => l.planId===planId && l.issueId===issueId && l.strategyId===strategyId, l => l.issueId===issueId && l.strategyId===strategyId, 'dimId','dimName') : [];
+            this.f5RenderMultiRows('dimension', dims, '— เลือกกลยุทธ์ —', 'dimension');
+            lm('substrategy'); lock('f5-kpidim','— เลือกกลยุทธ์ก่อน —'); lm('kpi');
+        } else if (step === 'dimension') {
+            const planId = val('f5-plan'), issueId = val('f5-issue'), strategyId = val('f5-strategy');
+            const dimIds = this.f5GetMultiValues('dimension');
+            let subs = [], kpiDims = [];
+            if (dimIds.length) {
+                dimIds.forEach(dimId => {
+                    subs = subs.concat(sor(l => l.planId===planId && l.issueId===issueId && l.strategyId===strategyId && l.dimId===dimId, l => l.strategyId===strategyId && l.dimId===dimId, 'subId','subName'));
+                    kpiDims = kpiDims.concat(sor(l => l.planId===planId && l.issueId===issueId && l.strategyId===strategyId && l.dimId===dimId, l => l.strategyId===strategyId && l.dimId===dimId, 'kpiDimId','kpiDimName'));
+                });
+                const s1 = new Set(), s2 = new Set();
+                subs = this.f4SortByName(subs.filter(x => !s1.has(x.id) && s1.add(x.id)));
+                kpiDims = this.f4SortByName(kpiDims.filter(x => !s2.has(x.id) && s2.add(x.id)));
+            }
+            this.f5RenderMultiRows('substrategy', subs, '— เลือกกลยุทธ์ย่อย (ถ้ามี) —', 'substrategy');
+            fill('f5-kpidim', kpiDims, '— เลือกมิติ —'); lm('kpi');
+        } else if (step === 'substrategy') {
+            const planId = val('f5-plan'), issueId = val('f5-issue'), strategyId = val('f5-strategy');
+            const dimIds = this.f5GetMultiValues('dimension'), subIds = this.f5GetMultiValues('substrategy');
+            if (subIds.length && dimIds.length) {
+                let kpiDims = [];
+                dimIds.forEach(dimId => subIds.forEach(subId => { kpiDims = kpiDims.concat(sor(l => l.planId===planId && l.issueId===issueId && l.strategyId===strategyId && l.dimId===dimId && l.subId===subId, l => l.dimId===dimId && l.subId===subId, 'kpiDimId','kpiDimName')); }));
+                const seen = new Set(); kpiDims = this.f4SortByName(kpiDims.filter(x => !seen.has(x.id) && seen.add(x.id)));
+                fill('f5-kpidim', kpiDims, '— เลือกมิติ —'); lm('kpi');
+            }
+        } else if (step === 'kpidim') {
+            const planId = val('f5-plan'), issueId = val('f5-issue'), strategyId = val('f5-strategy');
+            const dimIds = this.f5GetMultiValues('dimension'), kpiDimId = val('f5-kpidim');
+            let kpis = [];
+            if (kpiDimId && dimIds.length) {
+                dimIds.forEach(dimId => { kpis = kpis.concat(sor(l => l.planId===planId && l.issueId===issueId && l.strategyId===strategyId && l.dimId===dimId && l.kpiDimId===kpiDimId, l => l.dimId===dimId && l.kpiDimId===kpiDimId, 'kpiId','kpiName')); });
+                const seen = new Set(); kpis = this.f4SortByName(kpis.filter(x => !seen.has(x.id) && seen.add(x.id)));
+            } else if (kpiDimId) kpis = fl(l => l.kpiDimId === kpiDimId, 'kpiId', 'kpiName');
+            this.f5RenderMultiRows('kpi', kpis, '— เลือกตัวชี้วัด —');
+        }
+    },
+
+    f5AddConstructRow() {
+        const body = document.getElementById('f5-construct-body');
+        if (!body) return;
+        const rowNum = body.children.length + 1;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-3 py-2 text-center text-gray-400 text-xs font-bold">${rowNum}</td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white text-xs f5-construct-desc" placeholder="รายการ..."></td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white text-xs f5-qty" type="number" placeholder="0" oninput="App.f5CalcRow(this)"></td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white text-xs f5-unit" placeholder="หน่วย"></td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white text-xs f5-price" type="number" placeholder="0.00" oninput="App.f5CalcRow(this)"></td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-gray-50 text-xs f5-rowsum text-right font-bold" type="number" placeholder="0.00" readonly></td>
+            <td class="px-3 py-2 no-print"><button onclick="this.closest('tr').remove();App.f5RecalcSum()" class="text-red-400 hover:text-red-600"><i data-lucide="trash-2" size="14"></i></button></td>`;
+        body.appendChild(tr);
+        if (window.lucide) lucide.createIcons();
+    },
+
+    f5RemoveConstructRow() {
+        const body = document.getElementById('f5-construct-body');
+        if (body && body.lastElementChild) body.lastElementChild.remove();
+        this.f5RecalcSum();
+    },
+
+    f5CalcRow(input) {
+        const tr = input.closest('tr');
+        if (!tr) return;
+        const qty = parseFloat(tr.querySelector('.f5-qty')?.value) || 0;
+        const price = parseFloat(tr.querySelector('.f5-price')?.value) || 0;
+        const rowSumEl = tr.querySelector('.f5-rowsum');
+        if (rowSumEl) rowSumEl.value = (qty * price).toFixed(2);
+        this.f5RecalcSum();
+    },
+
+    f5RecalcSum() {
+        let total = 0;
+        document.querySelectorAll('.f5-rowsum').forEach(el => { total += parseFloat(el.value) || 0; });
+        const sumEl = document.getElementById('f5-construct-sum');
+        if (sumEl) sumEl.textContent = total.toFixed(2);
+    },
+
+    f5BuildKpiOptions() {
+        const cache = this._f4cache;
+        if (!cache) return '<option value="">— ยังไม่มีข้อมูลตัวชี้วัด —</option>';
+        const kpiItems = (cache.kpis || []).filter(k => k.type === 'kpi');
+        const seen = new Set();
+        const uniq = kpiItems.filter(k => k.name && !seen.has(k.name) && seen.add(k.name));
+        if (!uniq.length) return '<option value="">— ยังไม่มีข้อมูลตัวชี้วัด —</option>';
+        return '<option value="">— เลือกตัวชี้วัด —</option>' + uniq.map(k => `<option value="${k.id}">${k.name}</option>`).join('');
+    },
+
+    f5AddKpiRow() {
+        const body = document.getElementById('f5-kpi-plan-body');
+        if (!body) return;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="px-3 py-2"><select class="input-flat w-full bg-white text-xs f5-kpi-select">${this.f5BuildKpiOptions()}</select></td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white text-xs" placeholder="ค่าเป้าหมาย"></td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white text-xs" placeholder="หน่วยนับ"></td>
+            <td class="px-3 py-2"><input class="input-flat w-full bg-white text-xs text-right" type="number" placeholder="0"></td>
+            <td class="px-3 py-2 no-print"><button onclick="this.closest('tr').remove()" class="text-red-400 hover:text-red-600"><i data-lucide="trash-2" size="14"></i></button></td>`;
+        body.appendChild(tr);
+        if (window.lucide) lucide.createIcons();
+    },
+
+    f5RemoveKpiRow() {
+        const body = document.getElementById('f5-kpi-plan-body');
+        if (body && body.lastElementChild) body.lastElementChild.remove();
+    },
+
+    f5SwitchAnalysisCase(n) {
+        [1,2,3,4].forEach(i => {
+            const el = document.getElementById(`f5-analysis-case-${i}`);
+            if (el) el.classList.toggle('hidden', i !== n);
+        });
+    },
+
+    resetForm5() {
+        ['f5-year','f5-dept','f5-branch','f5-item-name','f5-budget-total',
+         'f5-commit-2570','f5-commit-2571','f5-commit-2572',
+         'f5-budget-source','f5-budget-other','f5-location',
+         'f5-need','f5-objective','f5-other-note',
+         'f5-demolish-source','f5-demolish-date','f5-design-date','f5-design-other',
+         'f5-plan-arch','f5-plan-struct','f5-plan-sanit','f5-plan-elec','f5-plan-total',
+         'f5-area-sqm','f5-price-sqm',
+         'f5-coord-name','f5-coord-position','f5-coord-phone-office','f5-coord-phone-mobile','f5-coord-email',
+         'f5-result-ult','f5-result-ult-unit','f5-result-out','f5-result-out-unit','f5-result-prod','f5-result-prod-unit',
+         'f5-edit-id'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+        document.querySelectorAll('[name^="f5-"]').forEach(el => { el.checked = false; });
+        const body = document.getElementById('f5-construct-body');
+        if (body) { body.innerHTML = ''; for(let i=0;i<3;i++) this.f5AddConstructRow(); }
+        const kpiBody = document.getElementById('f5-kpi-plan-body');
+        if (kpiBody) { kpiBody.innerHTML = ''; this.f5AddKpiRow(); }
+        [1,2,3,4].forEach(i => { const el = document.getElementById(`f5-analysis-case-${i}`); if(el) el.classList.add('hidden'); });
+        // reset cascade strategy dropdowns
+        const issueEl = document.getElementById('f5-issue');
+        if (issueEl) { issueEl.value = ''; issueEl.classList.add('f4-placeholder'); }
+        ['f5-strategy','f5-dimension','f5-kpidim'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.disabled = true; el.innerHTML = '<option value="">— เลือกขั้นตอนก่อนหน้า —</option>'; el.classList.add('f4-placeholder'); }
+        });
+        this.f5RecalcSum();
+        ['cnt-f5-need','cnt-f5-obj','cnt-f5-note'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '0'; });
+    },
+
+    async saveForm5() {
+        try {
+            const constructRows = Array.from(document.querySelectorAll('#f5-construct-body tr')).map(tr => ({
+                desc: tr.querySelector('.f5-construct-desc')?.value || '',
+                qty: tr.querySelector('.f5-qty')?.value || '',
+                unit: tr.querySelector('.f5-unit')?.value || '',
+                price: tr.querySelector('.f5-price')?.value || '',
+                rowSum: tr.querySelector('.f5-rowsum')?.value || ''
+            }));
+            const kpiRows = Array.from(document.querySelectorAll('#f5-kpi-plan-body tr')).map(tr => {
+                const sel = tr.querySelector('.f5-kpi-select');
+                const inputs = tr.querySelectorAll('input');
+                return { kpiId: sel?.value||'', kpi: sel?.selectedOptions?.[0]?.text||sel?.value||'', target: inputs[0]?.value||'', unit: inputs[1]?.value||'', amount: inputs[2]?.value||'' };
+            });
+            const months = ['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'];
+            const signPlan = {}, payPlan = {};
+            months.forEach(m => { signPlan[m] = document.getElementById(`f5-sign-${m}`)?.value||''; payPlan[m] = document.getElementById(`f5-pay-${m}`)?.value||''; });
+            const stratIssue = document.getElementById('f5-issue')?.value||'';
+            const stratIssueName = document.getElementById('f5-issue')?.selectedOptions?.[0]?.text||'';
+            const stratStrategy = document.getElementById('f5-strategy')?.value||'';
+            const stratStrategyName = document.getElementById('f5-strategy')?.selectedOptions?.[0]?.text||'';
+            const stratDimension = document.getElementById('f5-dimension')?.value||'';
+            const stratDimensionName = document.getElementById('f5-dimension')?.selectedOptions?.[0]?.text||'';
+            const stratKpiDim = document.getElementById('f5-kpidim')?.value||'';
+            const stratKpiDimName = document.getElementById('f5-kpidim')?.selectedOptions?.[0]?.text||'';
+            const payload = {
+                year: document.getElementById('f5-year')?.value||'',
+                dept: document.getElementById('f5-dept')?.value||'',
+                deptName: document.getElementById('f5-dept')?.selectedOptions?.[0]?.text||'',
+                branch: document.getElementById('f5-branch')?.value||'',
+                branchName: document.getElementById('f5-branch')?.selectedOptions?.[0]?.text||'',
+                itemName: document.getElementById('f5-item-name')?.value||'',
+                budgetTotal: document.getElementById('f5-budget-total')?.value||'',
+                commit2570: document.getElementById('f5-commit-2570')?.value||'',
+                commit2571: document.getElementById('f5-commit-2571')?.value||'',
+                commit2572: document.getElementById('f5-commit-2572')?.value||'',
+                constructType: document.querySelector('[name="f5-construct-type"]:checked')?.value||'',
+                budgetSource: document.getElementById('f5-budget-source')?.value||'',
+                budgetOther: document.getElementById('f5-budget-other')?.value||'',
+                location: document.getElementById('f5-location')?.value||'',
+                stratIssue, stratIssueName,
+                stratStrategy, stratStrategyName,
+                stratDimension, stratDimensionName,
+                stratKpiDim, stratKpiDimName,
+                need: document.getElementById('f5-need')?.value||'',
+                objective: document.getElementById('f5-objective')?.value||'',
+                siteReady: document.querySelector('[name="f5-site-ready"]:checked')?.value||'',
+                demolishSource: document.getElementById('f5-demolish-source')?.value||'',
+                demolishDate: document.getElementById('f5-demolish-date')?.value||'',
+                designReady: document.querySelector('[name="f5-design-ready"]:checked')?.value||'',
+                designDate: document.getElementById('f5-design-date')?.value||'',
+                designOther: document.getElementById('f5-design-other')?.value||'',
+                planArch: document.getElementById('f5-plan-arch')?.value||'',
+                planStruct: document.getElementById('f5-plan-struct')?.value||'',
+                planSanit: document.getElementById('f5-plan-sanit')?.value||'',
+                planElec: document.getElementById('f5-plan-elec')?.value||'',
+                planTotal: document.getElementById('f5-plan-total')?.value||'',
+                areaSqm: document.getElementById('f5-area-sqm')?.value||'',
+                priceSqm: document.getElementById('f5-price-sqm')?.value||'',
+                constructRows, signPlan, payPlan,
+                otherNote: document.getElementById('f5-other-note')?.value||'',
+                kpiRows,
+                resultUlt: document.getElementById('f5-result-ult')?.value||'',
+                resultUltUnit: document.getElementById('f5-result-ult-unit')?.value||'',
+                resultOut: document.getElementById('f5-result-out')?.value||'',
+                resultOutUnit: document.getElementById('f5-result-out-unit')?.value||'',
+                resultProd: document.getElementById('f5-result-prod')?.value||'',
+                resultProdUnit: document.getElementById('f5-result-prod-unit')?.value||'',
+                analysisCase: document.querySelector('[name="f5-analysis-case"]:checked')?.value||'',
+                coordName: document.getElementById('f5-coord-name')?.value||'',
+                coordPosition: document.getElementById('f5-coord-position')?.value||'',
+                coordPhoneOffice: document.getElementById('f5-coord-phone-office')?.value||'',
+                coordPhoneMobile: document.getElementById('f5-coord-phone-mobile')?.value||'',
+                coordEmail: document.getElementById('f5-coord-email')?.value||'',
+                savedBy: currentUser?.username||'',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            if (!payload.itemName) return alert('กรุณาระบุรายการสิ่งก่อสร้าง');
+            if (!payload.dept) return alert('กรุณาเลือกหน่วยงาน');
+            this.showLoader();
+            const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('form5');
+            const editId = document.getElementById('f5-edit-id')?.value||'';
+            if (editId) await col.doc(editId).set(payload, { merge: true });
+            else {
+                payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                const ref = await col.add(payload);
+                const hid = document.getElementById('f5-edit-id');
+                if (hid) hid.value = ref.id;
+            }
+            alert('บันทึกเรียบร้อย');
+            await this.loadForm5Records();
+        } catch(e) { console.error('saveForm5 error', e); alert('บันทึกไม่สำเร็จ'); }
+        finally { this.hideLoader(); }
+    },
+
+    async loadForm5Records() {
+        const tbody = document.getElementById('f5-records-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">กำลังโหลด...</td></tr>';
+        try {
+            const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data')
+                .collection('form5').orderBy('createdAt', 'desc').limit(50).get();
+            if (snap.empty) { tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">ยังไม่มีรายการ</td></tr>'; return; }
+            tbody.innerHTML = '';
+            snap.forEach((doc, idx) => {
+                const d = doc.data();
+                const date = d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString('th-TH') : '-';
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-indigo-50/30 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-4 py-3 text-center text-gray-400 text-xs font-bold">${idx+1}</td>
+                    <td class="px-4 py-3 font-bold text-sm text-indigo-900">${d.itemName||'-'}</td>
+                    <td class="px-4 py-3 text-xs text-gray-600">${d.deptName||d.dept||'-'}</td>
+                    <td class="px-4 py-3 text-xs text-gray-600">${d.constructType||'-'}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500">${d.savedBy||'-'}</td>
+                    <td class="px-4 py-3 text-xs text-gray-400">${date}</td>
+                    <td class="px-4 py-3 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="App.editForm5('${doc.id}')" class="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg" title="แก้ไข"><i data-lucide="pencil" size="14"></i></button>
+                            <button onclick="App.deleteForm5('${doc.id}')" class="p-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg" title="ลบ"><i data-lucide="trash-2" size="14"></i></button>
+                        </div>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+            if (window.lucide) lucide.createIcons();
+        } catch(e) { console.error('loadForm5Records error', e); tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-red-400 text-xs font-bold">โหลดข้อมูลไม่สำเร็จ</td></tr>'; }
+    },
+
+    async editForm5(id) {
+        try {
+            this.showLoader();
+            const doc = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('form5').doc(id).get();
+            if (!doc.exists) return alert('ไม่พบข้อมูล');
+            const d = doc.data();
+            this.resetForm5();
+            const setVal = (elId, val) => { const el = document.getElementById(elId); if(el) el.value = val||''; };
+            setVal('f5-edit-id', id);
+            setVal('f5-year', d.year); setVal('f5-dept', d.dept);
+            if (d.dept) { await this.f5LoadBranches(); setVal('f5-branch', d.branch); }
+            setVal('f5-item-name', d.itemName); setVal('f5-budget-total', d.budgetTotal);
+            setVal('f5-commit-2570', d.commit2570); setVal('f5-commit-2571', d.commit2571); setVal('f5-commit-2572', d.commit2572);
+            setVal('f5-budget-source', d.budgetSource); setVal('f5-budget-other', d.budgetOther);
+            setVal('f5-location', d.location);
+            setVal('f5-need', d.need); setVal('f5-objective', d.objective);
+            setVal('f5-other-note', d.otherNote);
+            setVal('f5-plan-arch', d.planArch); setVal('f5-plan-struct', d.planStruct);
+            setVal('f5-plan-sanit', d.planSanit); setVal('f5-plan-elec', d.planElec); setVal('f5-plan-total', d.planTotal);
+            setVal('f5-area-sqm', d.areaSqm); setVal('f5-price-sqm', d.priceSqm);
+            setVal('f5-coord-name', d.coordName); setVal('f5-coord-position', d.coordPosition);
+            setVal('f5-coord-phone-office', d.coordPhoneOffice); setVal('f5-coord-phone-mobile', d.coordPhoneMobile);
+            setVal('f5-coord-email', d.coordEmail);
+            if (d.constructType) { const r = document.querySelector(`[name="f5-construct-type"][value="${d.constructType}"]`); if(r) r.checked = true; }
+            if (d.siteReady) { const r = document.querySelector(`[name="f5-site-ready"][value="${d.siteReady}"]`); if(r) r.checked = true; }
+            if (d.designReady) { const r = document.querySelector(`[name="f5-design-ready"][value="${d.designReady}"]`); if(r) r.checked = true; }
+            // Restore cascade strategy dropdowns (4 ขั้น)
+            if (d.stratIssue) {
+                const issueEl = document.getElementById('f5-issue');
+                if (issueEl) { issueEl.value = d.stratIssue; issueEl.classList.remove('f4-placeholder'); }
+                this.f5StratCascade('issue'); await new Promise(r => setTimeout(r, 50));
+            }
+            if (d.stratStrategy) {
+                const el = document.getElementById('f5-strategy');
+                if (el) { el.value = d.stratStrategy; el.classList.remove('f4-placeholder'); }
+                this.f5StratCascade('strategy'); await new Promise(r => setTimeout(r, 50));
+            }
+            if (d.stratDimension) {
+                const el = document.getElementById('f5-dimension');
+                if (el) { el.value = d.stratDimension; el.classList.remove('f4-placeholder'); }
+                this.f5StratCascade('dimension'); await new Promise(r => setTimeout(r, 50));
+            }
+            if (d.stratKpiDim) {
+                const el = document.getElementById('f5-kpidim');
+                if (el) { el.value = d.stratKpiDim; el.classList.remove('f4-placeholder'); }
+            }
+            const months = ['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'];
+            months.forEach(m => { setVal(`f5-sign-${m}`, d.signPlan?.[m]); setVal(`f5-pay-${m}`, d.payPlan?.[m]); });
+            const body = document.getElementById('f5-construct-body');
+            if (body && d.constructRows?.length) {
+                body.innerHTML = ''; d.constructRows.forEach(() => this.f5AddConstructRow());
+                body.querySelectorAll('tr').forEach((row, i) => {
+                    if (!d.constructRows[i]) return;
+                    const r = d.constructRows[i];
+                    row.querySelector('.f5-construct-desc').value = r.desc||'';
+                    row.querySelector('.f5-qty').value = r.qty||'';
+                    row.querySelector('.f5-unit').value = r.unit||'';
+                    row.querySelector('.f5-price').value = r.price||'';
+                    row.querySelector('.f5-rowsum').value = r.rowSum||'';
+                });
+            }
+            this.f5RecalcSum();
+            const kpiBody = document.getElementById('f5-kpi-plan-body');
+            if (kpiBody && d.kpiRows?.length) {
+                kpiBody.innerHTML = ''; d.kpiRows.forEach(r => {
+                    this.f5AddKpiRow();
+                    const last = kpiBody.lastElementChild; if (!last) return;
+                    const sel = last.querySelector('.f5-kpi-select'); if (sel && r.kpiId) sel.value = r.kpiId;
+                    const inputs = last.querySelectorAll('input');
+                    if (inputs[0]) inputs[0].value = r.target||'';
+                    if (inputs[1]) inputs[1].value = r.unit||'';
+                    if (inputs[2]) inputs[2].value = r.amount||'';
+                });
+            }
+            setVal('f5-result-ult', d.resultUlt); setVal('f5-result-ult-unit', d.resultUltUnit);
+            setVal('f5-result-out', d.resultOut); setVal('f5-result-out-unit', d.resultOutUnit);
+            setVal('f5-result-prod', d.resultProd); setVal('f5-result-prod-unit', d.resultProdUnit);
+            if (d.analysisCase) { const r = document.querySelector(`[name="f5-analysis-case"][value="${d.analysisCase}"]`); if(r) { r.checked = true; this.f5SwitchAnalysisCase(parseInt(d.analysisCase)); } }
+            ['f5-need','f5-objective','f5-other-note'].forEach(id => document.getElementById(id)?.dispatchEvent(new Event('input')));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch(e) { console.error('editForm5 error', e); alert('โหลดข้อมูลไม่สำเร็จ'); }
+        finally { this.hideLoader(); }
+    },
+
+    async deleteForm5(id) {
+        if (!confirm('ยืนยันการลบรายการนี้?')) return;
+        try {
+            this.showLoader();
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('form5').doc(id).delete();
+            alert('ลบเรียบร้อย');
+            await this.loadForm5Records();
+        } catch(e) { console.error('deleteForm5 error', e); alert('ลบไม่สำเร็จ'); }
+        finally { this.hideLoader(); }
     },
 
     // --- Master Data Ops ---
@@ -2942,6 +3531,7 @@ async fillDeptSelectForBranches() {
     },
     showLoader() { document.getElementById('loader').classList.remove('hidden'); },
     hideLoader() { document.getElementById('loader').classList.add('hidden'); },
+    doPrint() { window.scrollTo({ top: 0 }); setTimeout(() => window.print(), 120); },
 
     /* ============================================================
        (ง.6) แบบเสนอขอโครงการ — รวมเข้ากับ App object
@@ -2949,6 +3539,20 @@ async fillDeptSelectForBranches() {
 
 
     /* ---------- INIT ---------- */
+    f6LoadBranches() {
+        const deptEl = document.getElementById('f6-dept');
+        const branchEl = document.getElementById('f6-branch');
+        if (!deptEl || !branchEl) return;
+        const deptId = deptEl.value;
+        if (!deptId) {
+            branchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
+            return;
+        }
+        const branches = (this._f6cache?.branches || []).filter(b => b.deptId === deptId);
+        branchEl.innerHTML = `<option value="">${branches.length ? '— เลือกสาขา/งาน —' : '— ไม่มีสาขา/งานในหน่วยงานนี้ —'}</option>` +
+            branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    },
+
     async initManageForm6() {
         if (!document.getElementById('f6-dept')) return;
 
@@ -3004,7 +3608,9 @@ async fillDeptSelectForBranches() {
             };
 
             setOptions(document.getElementById('f6-dept'),   cache.depts);
-            setOptions(document.getElementById('f6-branch'), cache.branches);
+            // สาขา/งาน: รีเซ็ตรอให้ผู้ใช้เลือก dept ก่อน
+            const f6BranchEl = document.getElementById('f6-branch');
+            if (f6BranchEl) f6BranchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
             setOptions(document.getElementById('f6-year'),   cache.years);
             setOptions(document.getElementById('f6-issue'),  cache.issues, '— เลือกประเด็นยุทธศาสตร์ —');
 
@@ -3484,6 +4090,7 @@ async fillDeptSelectForBranches() {
 
             document.getElementById('f6-edit-id').value = id;
             document.getElementById('f6-dept').value = d.deptId || '';
+            this.f6LoadBranches();
             document.getElementById('f6-branch').value = d.branchId || '';
             document.getElementById('f6-year').value = ''; // ปล่อยให้ผู้ใช้ตรวจสอบ/เลือกใหม่ถ้าจำเป็น (label เทียบยาก)
             document.getElementById('f6-project-name').value = det.projectName || '';

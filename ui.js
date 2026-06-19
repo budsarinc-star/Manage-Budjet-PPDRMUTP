@@ -59,7 +59,7 @@ const UI = {
                 <button onclick="App.switchSubTab('manage', 'tab2')" class="flex-1 py-4 px-6 rounded-2xl font-bold transition-all ${subTab === 'tab2' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-gray-500'}">(ง.5)</button>
                 <button onclick="App.switchSubTab('manage', 'tab3')" class="flex-1 py-4 px-6 rounded-2xl font-bold transition-all ${subTab === 'tab3' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-gray-500'}">(ง.6)</button>
             </div>
-            ${subTab === 'tab1' ? this.manageForm4Template() : (subTab === 'tab3' ? this.manageForm6Template() : `<div class="card-main p-20 text-center text-gray-300 italic">อยู่ระหว่างรอดำเนินการ</div>`)}
+            ${subTab === 'tab1' ? this.manageForm4Template() : (subTab === 'tab2' ? this.manageForm5Template() : (subTab === 'tab3' ? this.manageForm6Template() : `<div class="card-main p-20 text-center text-gray-300 italic">อยู่ระหว่างรอดำเนินการ</div>`))}
         </div>
 <!-- Admin Edit Modal Root (เฉพาะหน้า ตั้งต้นข้อมูล) -->
 <div id="admin-edit-modal" class="hidden"></div>`;
@@ -101,7 +101,7 @@ const UI = {
                         </div>
                         <div class="f4-cell">
                             <label class="f4-cell-label">หน่วยงาน <span class="text-red-500">*</span></label>
-                            <select id="f-dept" class="f4-cell-input"></select>
+                            <select id="f-dept" class="f4-cell-input" onchange="App.f4LoadBranches()"></select>
                         </div>
                         <div class="f4-cell">
                             <label class="f4-cell-label">สาขา / งาน <span class="text-red-500">*</span></label>
@@ -951,6 +951,30 @@ const UI = {
 
             </div>
         </div>
+<!-- ===== ลายเซ็น (แสดงเฉพาะตอน Print) ===== -->
+<div class="print-only print-signature-block">
+    <div class="print-signature-grid">
+        <div class="print-signature-col">
+            <div class="print-signature-line"></div>
+            <div class="print-signature-name">ผู้เสนอโครงการ</div>
+            <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+            <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+        </div>
+        <div class="print-signature-col">
+            <div class="print-signature-line"></div>
+            <div class="print-signature-name">หัวหน้าหน่วยงาน</div>
+            <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+            <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+        </div>
+        <div class="print-signature-col">
+            <div class="print-signature-line"></div>
+            <div class="print-signature-name">ผู้อนุมัติ</div>
+            <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+            <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+        </div>
+    </div>
+</div>
+
 <!-- ===== ปุ่มล่างสุด บันทึก / ล้างค่า ===== -->
 <div class="no-print mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
     <button onclick="App.saveForm4()"
@@ -961,7 +985,7 @@ const UI = {
         class="flex-1 sm:flex-none sm:w-44 bg-white text-gray-500 py-4 rounded-2xl font-bold shadow-sm border border-gray-200 flex items-center justify-center gap-3 text-base hover:bg-gray-50 transition-all">
         <i data-lucide="refresh-ccw" class="w-5 h-5"></i> ล้างค่า
     </button>
-    <button onclick="window.print()"
+    <button onclick="App.doPrint()"
         class="flex-1 sm:flex-none sm:w-44 bg-slate-700 hover:bg-slate-800 text-white py-4 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-3 text-base transition-all">
         <i data-lucide="printer" class="w-5 h-5"></i> Print / PDF
     </button>
@@ -1276,6 +1300,671 @@ adminMiniTableBlock(title, key, headers) {
         return `<div class="card-main relative overflow-hidden p-10"><div class="rainbow-line absolute top-0 left-0 w-full h-1"></div><h3 class="text-[#4c1d95] font-black text-2xl flex items-center gap-3 mb-10"><i data-lucide="users" size="28"></i> จัดการผู้ใช้งานระบบ</h3><div class="bg-[#f5f3ff] p-8 rounded-[2rem] border border-purple-100 shadow-sm mb-12"><div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 items-end"><input type="hidden" id="u-edit-id"><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Username</label><input id="u-user" placeholder="ระบุชื่อผู้ใช้" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Password</label><input id="u-pass" placeholder="ระบุรหัสผ่าน" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ชื่อ-นามสกุล</label><input id="u-fullname" placeholder="ระบุชื่อ-สกุล" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">สิทธิ์การใช้งาน</label><select id="u-role" class="input-flat w-full bg-white font-bold"><option value="admin">ผู้ดูแลระบบ</option><option value="manager">ผู้บริหาร</option><option value="staff_central">เจ้าหน้าที่ส่วนกลาง</option><option value="staff_dept">เจ้าหน้าที่หน่วยงาน</option></select></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ตำแหน่ง</label><input id="u-pos" placeholder="ระบุตำแหน่ง" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">หน่วยงาน</label><select id="u-dept-select" class="input-flat w-full bg-white font-bold"></select></div><div class="lg:col-span-2 flex gap-2 justify-end"><button id="btn-save-user" onclick="App.saveUser()" class="bg-[#10b981] hover:bg-green-600 text-white h-[42px] px-6 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all"><i data-lucide="check-circle" size="18"></i> บันทึก</button><button onclick="App.resetUserForm()" class="bg-gray-100 text-gray-400 h-[42px] w-[42px] rounded-xl flex items-center justify-center hover:bg-gray-200"><i data-lucide="refresh-ccw" size="18"></i></button></div></div></div><div class="overflow-hidden border border-purple-50 rounded-[2rem] bg-white shadow-xl"><table class="w-full text-left text-sm"><thead class="table-header"><tr class="bg-indigo-50/50"><th class="px-6 py-5">Username</th><th class="px-6 py-5">Password</th><th class="px-6 py-5">ชื่อ - นามสกุล</th><th class="px-6 py-5 text-center">สิทธิ์</th><th class="px-6 py-5">ตำแหน่ง</th><th class="px-6 py-5">หน่วยงาน</th><th class="px-6 py-5">วันที่บันทึก</th><th class="px-6 py-5 text-center">จัดการ</th></tr></thead><tbody id="user-list-body" class="divide-y divide-gray-50"></tbody></table></div><div id="user-edit-modal" class="hidden"></div></div>`;
     },
 
+    manageForm5Template() {
+        return `<div class="card-main p-12 bg-white relative print:p-0 print:shadow-none form4-page">
+            <!-- Print-only -->
+            <div class="print-only form4-print-code">แบบ ง.5</div>
+
+            <div class="flex flex-col md:flex-row justify-between items-start gap-4 mb-10 no-print">
+                <div>
+                    <h3 class="text-indigo-900 font-black text-2xl">(ง.5) รายละเอียดคำชี้แจงรายการสิ่งก่อสร้างและปรับปรุงสิ่งก่อสร้าง</h3>
+                    <p class="text-[11px] text-gray-400 font-bold mt-1">ข้อมูล <span class="text-red-500">*</span> สีแดง คือบังคับกรอกข้อมูล</p>
+                </div>
+                <div class="flex gap-2 items-center">
+                    <input type="hidden" id="f5-edit-id">
+                    <div class="text-right pr-1 text-[11px] font-bold text-gray-500">แบบ ง.5</div>
+                </div>
+            </div>
+
+            <!-- หัวข้อกลาง -->
+            <div class="text-center mb-10 form4-header">
+                <img src="logo.png" class="w-20 mx-auto mb-4" alt="RMUTP Logo">
+                <h4 class="font-bold text-xl">มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร</h4>
+                <h5 class="font-bold text-lg text-slate-500">รายละเอียดคำชี้แจงรายการสิ่งก่อสร้างและปรับปรุงสิ่งก่อสร้าง</h5>
+                <p class="text-xs text-gray-400 mt-1">(ฉบับปรับปรุงใหม่ กันยายน 2568)</p>
+            </div>
+
+            <div class="space-y-6">
+
+                <!-- ══ SECTION A: ข้อมูลพื้นฐาน ══ -->
+                <div class="space-y-0 rounded-[1.5rem] border border-gray-100 overflow-hidden shadow-sm">
+                    <div class="grid grid-cols-3 divide-x divide-gray-100 bg-white">
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">ปีงบประมาณ <span class="text-red-500">*</span></label>
+                            <select id="f5-year" class="f4-cell-input"></select>
+                        </div>
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">หน่วยงาน <span class="text-red-500">*</span></label>
+                            <select id="f5-dept" class="f4-cell-input" onchange="App.f5LoadBranches()"></select>
+                        </div>
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">สาขา / งาน <span class="text-red-500">*</span></label>
+                            <select id="f5-branch" class="f4-cell-input"></select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-[2fr_1fr] divide-x divide-gray-100 bg-gray-50/50 border-t border-gray-100">
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">รายการ <span class="text-red-500">*</span></label>
+                            <input id="f5-item-name" class="f4-cell-input" placeholder="ระบุชื่อรายการสิ่งก่อสร้าง เช่น อาคารปฏิบัติการ ฯลฯ">
+                        </div>
+                        <div class="f4-cell">
+                            <label class="f4-cell-label">วงเงิน (บาท) <span class="text-red-500">*</span></label>
+                            <input id="f5-budget-total" type="number" class="f4-cell-input" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="bg-amber-50/40 border-t border-amber-100 p-4">
+                        <p class="text-[11px] font-bold text-amber-700 mb-3">ถ้าเป็นรายการผูกพัน — ระบุวงเงินแต่ละปี</p>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-bold text-gray-500">ขอตั้งปี 2570</label>
+                                <input id="f5-commit-2570" type="number" class="input-flat w-full bg-white text-xs" placeholder="0">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-bold text-gray-500">ผูกพันปี 2571</label>
+                                <input id="f5-commit-2571" type="number" class="input-flat w-full bg-white text-xs" placeholder="0">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[10px] font-bold text-gray-500">ผูกพันปี 2572</label>
+                                <input id="f5-commit-2572" type="number" class="input-flat w-full bg-white text-xs" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ข้อ 2: ประเภทสิ่งก่อสร้าง -->
+                <div class="space-y-3">
+                    <label class="text-xs font-bold text-red-500">* 2. ประเภทสิ่งก่อสร้าง</label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <label class="flex items-center gap-3 bg-white p-4 rounded-2xl border border-indigo-100 cursor-pointer">
+                            <input type="radio" name="f5-construct-type" value="ปีเดียว" class="accent-indigo-600">
+                            <span class="font-bold text-sm text-gray-700">สิ่งก่อสร้างปีเดียว</span>
+                        </label>
+                        <label class="flex items-center gap-3 bg-white p-4 rounded-2xl border border-indigo-100 cursor-pointer">
+                            <input type="radio" name="f5-construct-type" value="ผูกพันใหม่" class="accent-indigo-600">
+                            <span class="font-bold text-sm text-gray-700">สิ่งก่อสร้างผูกพันใหม่</span>
+                        </label>
+                        <label class="flex items-center gap-3 bg-white p-4 rounded-2xl border border-indigo-100 cursor-pointer">
+                            <input type="radio" name="f5-construct-type" value="ภาระผูกพัน" class="accent-indigo-600">
+                            <span class="font-bold text-sm text-gray-700">สิ่งก่อสร้างที่มีภาระผูกพัน (สัญญา)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- ข้อ 3: แหล่งงบประมาณ -->
+                <div class="space-y-3">
+                    <label class="text-xs font-bold text-red-500">* 3. แหล่งงบประมาณ</label>
+                    <div class="space-y-0 rounded-[1.5rem] border border-gray-100 overflow-hidden shadow-sm">
+                        <div class="grid grid-cols-[1fr_1fr] divide-x divide-gray-100 bg-white">
+                            <div class="f4-cell">
+                                <label class="f4-cell-label">แหล่งเงินงบประมาณ <span class="text-red-500">*</span></label>
+                                <select id="f5-budget-source" class="f4-cell-input">
+                                    <option value="">— เลือก —</option>
+                                    <option value="รายจ่าย">งบประมาณรายจ่ายประจำปีงบประมาณ</option>
+                                    <option value="รายได้">งบประมาณรายได้ประจำปีงบประมาณ</option>
+                                    <option value="อื่นๆ">งบประมาณอื่นๆ</option>
+                                </select>
+                            </div>
+                            <div class="f4-cell">
+                                <label class="f4-cell-label text-gray-400">อื่นๆ โปรดระบุ</label>
+                                <input id="f5-budget-other" class="f4-cell-input" placeholder="โปรดระบุ (กรณีเลือกอื่นๆ)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ข้อ 4: สถานที่ดำเนินการ -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-bold text-red-500">* 4. สถานที่ดำเนินการ</label>
+                    <input id="f5-location" class="input-flat w-full" placeholder="ระบุสถานที่ดำเนินการ...">
+                </div>
+
+                <!-- ══ SECTION B: ความสอดคล้องยุทธศาสตร์ ══ -->
+                <div class="space-y-3">
+                    <div class="text-xs font-bold text-red-500 flex items-center gap-2">
+                        <i data-lucide="target" size="13"></i>
+                        * ความสอดคล้องกับประเด็นยุทธศาสตร์ / กลยุทธ์ / มิติ และ ตัวชี้วัดความสำเร็จตามแผนพัฒนามหาวิทยาลัย
+                    </div>
+                    <div class="rounded-[1.5rem] border border-indigo-100 overflow-hidden shadow-sm">
+
+                        <!-- ขั้น 1: ประเด็นยุทธศาสตร์ -->
+                        <div class="f4-strat-row bg-white">
+                            <div class="f4-strat-badge bg-indigo-600 text-white">5</div>
+                            <div class="f4-strat-label">ประเด็นยุทธศาสตร์</div>
+                            <div class="f4-strat-field">
+                                <select id="f5-issue" class="f4-strat-select f4-placeholder" onchange="App.f5StratCascade('issue')">
+                                    <option value="">— เลือกประเด็นยุทธศาสตร์ —</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- ขั้น 2: วัตถุประสงค์เชิงยุทธศาสตร์ -->
+                        <div class="f4-strat-row bg-indigo-50/30 border-t border-indigo-50">
+                            <div class="f4-strat-badge bg-indigo-500 text-white">6</div>
+                            <div class="f4-strat-label">วัตถุประสงค์เชิงยุทธศาสตร์</div>
+                            <div class="f4-strat-field">
+                                <select id="f5-strategy" class="f4-strat-select f4-placeholder" disabled onchange="App.f5StratCascade('strategy')">
+                                    <option value="">— เลือกประเด็นก่อน —</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- ขั้น 3: กลยุทธ์ -->
+                        <div class="f4-strat-row bg-white border-t border-indigo-50">
+                            <div class="f4-strat-badge bg-purple-500 text-white">7</div>
+                            <div class="f4-strat-label">ความสอดคล้องกับกลยุทธ์</div>
+                            <div class="f4-strat-field">
+                                <select id="f5-dimension" class="f4-strat-select f4-placeholder" disabled onchange="App.f5StratCascade('dimension')">
+                                    <option value="">— เลือกวัตถุประสงค์ก่อน —</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- ขั้น 4: มิติ (BSC) -->
+                        <div class="f4-strat-row bg-indigo-50/30 border-t border-indigo-50">
+                            <div class="f4-strat-badge bg-emerald-500 text-white">8</div>
+                            <div class="f4-strat-label">มิติ (BSC)</div>
+                            <div class="f4-strat-field">
+                                <select id="f5-kpidim" class="f4-strat-select f4-placeholder" disabled>
+                                    <option value="">— เลือกกลยุทธ์ก่อน —</option>
+                                </select>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ข้อ 9: เหตุผลความจำเป็น -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-red-500">* 9. เหตุผลความจำเป็น</label>
+                        <span class="text-[10px] font-bold text-gray-400"><span id="cnt-f5-need">0</span>/3000</span>
+                    </div>
+                    <textarea id="f5-need" maxlength="3000" rows="6" class="input-flat w-full"
+                        placeholder="- ระบุความสำคัญ ความจำเป็น และเหตุผลในการพัฒนาโครงการ"
+                        oninput="document.getElementById('cnt-f5-need').textContent=this.value.length"></textarea>
+                </div>
+
+                <!-- ข้อ 10: วัตถุประสงค์ -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-red-500">* 10. วัตถุประสงค์</label>
+                        <span class="text-[10px] font-bold text-gray-400"><span id="cnt-f5-obj">0</span>/3000</span>
+                    </div>
+                    <textarea id="f5-objective" maxlength="3000" rows="4" class="input-flat w-full"
+                        placeholder="ระบุวัตถุประสงค์ของโครงการ..."
+                        oninput="document.getElementById('cnt-f5-obj').textContent=this.value.length"></textarea>
+                </div>
+
+                <!-- ข้อ 11: ความพร้อมในการดำเนินการจัดจ้าง -->
+                <div class="space-y-4">
+                    <label class="text-xs font-bold">11. ความพร้อมในการดำเนินการจัดจ้าง</label>
+                    <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] space-y-6">
+                        <div class="space-y-3">
+                            <div class="font-bold text-sm text-gray-700">11.1 ความพร้อมของสถานที่ก่อสร้าง</div>
+                            <div class="space-y-2">
+                                <label class="flex items-start gap-3"><input type="radio" name="f5-site-ready" value="พร้อม" class="mt-1 accent-indigo-600"><span class="text-sm">พร้อมเข้าก่อสร้างได้ทันที</span></label>
+                                <label class="flex items-start gap-3">
+                                    <input type="radio" name="f5-site-ready" value="รื้อถอน" class="mt-1 accent-indigo-600">
+                                    <div class="flex-1">
+                                        <span class="text-sm">ต้องรื้อถอนสิ่งปลูกสร้างเดิมก่อน</span>
+                                        <div class="grid grid-cols-2 gap-3 mt-2">
+                                            <input id="f5-demolish-source" class="input-flat w-full bg-gray-50 text-xs" placeholder="ระบุแหล่งงบประมาณ">
+                                            <input id="f5-demolish-date" class="input-flat w-full bg-gray-50 text-xs" placeholder="คาดว่าแล้วเสร็จภายใน...">
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="font-bold text-sm text-gray-700">11.2 ความพร้อมของแบบรูปรายการ</div>
+                            <div class="space-y-2">
+                                <label class="flex items-start gap-3"><input type="radio" name="f5-design-ready" value="เสร็จแล้ว" class="mt-1 accent-indigo-600"><span class="text-sm">ออกแบบเสร็จเรียบร้อยแล้ว</span></label>
+                                <label class="flex items-start gap-3">
+                                    <input type="radio" name="f5-design-ready" value="กำลังออกแบบ" class="mt-1 accent-indigo-600">
+                                    <div class="flex-1">
+                                        <span class="text-sm">อยู่ระหว่างออกแบบ</span>
+                                        <input id="f5-design-date" class="input-flat w-full bg-gray-50 text-xs mt-2" placeholder="คาดว่าจะแล้วเสร็จ...">
+                                    </div>
+                                </label>
+                                <label class="flex items-start gap-3">
+                                    <input type="radio" name="f5-design-ready" value="อื่นๆ" class="mt-1 accent-indigo-600">
+                                    <div class="flex-1">
+                                        <span class="text-sm">อื่นๆ</span>
+                                        <input id="f5-design-other" class="input-flat w-full bg-gray-50 text-xs mt-2" placeholder="ระบุ...">
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="font-bold text-sm text-gray-700">จำนวนแบบรูป (แผ่น)</div>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">แบบรูปสถาปัตยกรรม</label><div class="flex items-center gap-2"><input id="f5-plan-arch" type="number" class="input-flat flex-1 bg-white text-xs" placeholder="0"><span class="text-xs text-gray-400">แผ่น</span></div></div>
+                                <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">แบบวิศวกรรมโครงสร้าง</label><div class="flex items-center gap-2"><input id="f5-plan-struct" type="number" class="input-flat flex-1 bg-white text-xs" placeholder="0"><span class="text-xs text-gray-400">แผ่น</span></div></div>
+                                <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">แบบรูปสุขาภิบาล</label><div class="flex items-center gap-2"><input id="f5-plan-sanit" type="number" class="input-flat flex-1 bg-white text-xs" placeholder="0"><span class="text-xs text-gray-400">แผ่น</span></div></div>
+                                <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">แบบวิศวกรรมไฟฟ้า</label><div class="flex items-center gap-2"><input id="f5-plan-elec" type="number" class="input-flat flex-1 bg-white text-xs" placeholder="0"><span class="text-xs text-gray-400">แผ่น</span></div></div>
+                                <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">แบบรูปรวมทั้งหมด</label><div class="flex items-center gap-2"><input id="f5-plan-total" type="number" class="input-flat flex-1 bg-white text-xs" placeholder="0"><span class="text-xs text-gray-400">แผ่น</span></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ตารางลักษณะการก่อสร้าง -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold">งบประมาณทั้งสิ้น / ลักษณะการก่อสร้าง</label>
+                        <div class="flex items-center gap-2 no-print">
+                            <button onclick="App.f5RemoveConstructRow()" class="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1"><i data-lucide="minus" size="14"></i> ลบแถว</button>
+                            <button onclick="App.f5AddConstructRow()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1"><i data-lucide="plus" size="14"></i> เพิ่มแถว</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-3">
+                        <div class="space-y-1.5">
+                            <label class="text-[11px] font-bold text-gray-500">งบประมาณทั้งสิ้น (บาท)</label>
+                            <input id="f5-total-budget-display" type="number" class="input-flat w-full bg-gray-50" placeholder="0.00" readonly>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-[11px] font-bold text-gray-500">ปริมาณงาน / ราคาต่อตารางเมตร</label>
+                            <div class="flex gap-2">
+                                <input id="f5-area-sqm" type="number" class="input-flat flex-1 bg-white" placeholder="ตารางเมตร">
+                                <input id="f5-price-sqm" type="number" class="input-flat flex-1 bg-white" placeholder="ราคา/ตร.ม.">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-main p-4 bg-white border border-indigo-50 rounded-[1.5rem] overflow-hidden">
+                        <div class="overflow-auto">
+                            <table class="w-full text-left text-sm min-w-[800px]">
+                                <thead class="table-header">
+                                    <tr class="bg-indigo-50/40">
+                                        <th class="px-3 py-3 w-10 text-center">#</th>
+                                        <th class="px-3 py-3">ลักษณะการก่อสร้าง / กิจกรรม / ดำเนินงาน</th>
+                                        <th class="px-3 py-3 w-36">ขนาด / ปริมาณ</th>
+                                        <th class="px-3 py-3 w-28">หน่วย</th>
+                                        <th class="px-3 py-3 w-36">ราคา / หน่วย (บาท)</th>
+                                        <th class="px-3 py-3 w-36">รวมเงิน (บาท)</th>
+                                        <th class="px-3 py-3 w-10 no-print"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="f5-construct-body" class="divide-y divide-gray-100"></tbody>
+                                <tfoot>
+                                    <tr class="bg-indigo-50/40 font-black">
+                                        <td colspan="5" class="px-3 py-3 text-right text-indigo-800">รวม</td>
+                                        <td class="px-3 py-3 text-indigo-800" id="f5-construct-sum">0.00</td>
+                                        <td class="no-print"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ข้อ 12: แผนการใช้จ่าย -->
+                <div class="space-y-3">
+                    <label class="text-xs font-bold">12. แผนการใช้จ่ายงบประมาณ (หน่วย : ล้านบาท ทศนิยม 3 ตำแหน่ง)</label>
+                    <div class="card-main p-4 bg-white border border-indigo-50 rounded-[1.5rem] overflow-hidden">
+                        <div class="overflow-auto">
+                            <table class="w-full text-center text-xs min-w-[900px]">
+                                <thead class="table-header">
+                                    <tr class="bg-indigo-50/40">
+                                        <th class="px-3 py-3 text-left">รายการ</th>
+                                        <th class="px-2 py-3">ต.ค.</th><th class="px-2 py-3">พ.ย.</th><th class="px-2 py-3">ธ.ค.</th>
+                                        <th class="px-2 py-3">ม.ค.</th><th class="px-2 py-3">ก.พ.</th><th class="px-2 py-3">มี.ค.</th>
+                                        <th class="px-2 py-3">เม.ย.</th><th class="px-2 py-3">พ.ค.</th><th class="px-2 py-3">มิ.ย.</th>
+                                        <th class="px-2 py-3">ก.ค.</th><th class="px-2 py-3">ส.ค.</th><th class="px-2 py-3">ก.ย.</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr>
+                                        <td class="px-3 py-2 text-left font-bold text-xs text-gray-600">ลงนามสัญญา</td>
+                                        <td><input id="f5-sign-oct" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-nov" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-dec" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-jan" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-feb" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-mar" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-apr" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-may" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-jun" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-jul" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-aug" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-sign-sep" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-2 text-left font-bold text-xs text-gray-600">เบิกจ่ายเงิน</td>
+                                        <td><input id="f5-pay-oct" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-nov" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-dec" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-jan" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-feb" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-mar" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-apr" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-may" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-jun" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-jul" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-aug" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                        <td><input id="f5-pay-sep" type="number" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ข้อ 13: คำชี้แจงอื่นๆ -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold">13. คำชี้แจงอื่น ๆ เพื่อประกอบการพิจารณา</label>
+                        <span class="text-[10px] font-bold text-gray-400"><span id="cnt-f5-note">0</span>/3000</span>
+                    </div>
+                    <textarea id="f5-other-note" maxlength="3000" rows="4" class="input-flat w-full"
+                        placeholder="เช่น แนบรูปถ่ายสถานที่ก่อสร้าง, ประวัติการก่อสร้าง/การปรับปรุงอาคาร..."
+                        oninput="document.getElementById('cnt-f5-note').textContent=this.value.length"></textarea>
+                </div>
+
+                <!-- ข้อ 14: ตัวชี้วัดความสำเร็จ -->
+                <div class="space-y-3">
+                    <label class="text-xs font-bold">14. สอดคล้องกับตัวชี้วัดความสำเร็จตามแผนพัฒนามหาวิทยาลัยฯ ฉบับที่ 13 (พ.ศ. 2566 – 2570)</label>
+                    <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] overflow-hidden">
+                        <div class="flex justify-between items-center mb-3 no-print">
+                            <div class="text-[11px] font-bold text-gray-500">ตัวชี้วัดตามแผนพัฒนามหาวิทยาลัยฯ ฉบับที่ 13</div>
+                            <div class="flex gap-2">
+                                <button onclick="App.f5RemoveKpiRow()" class="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1"><i data-lucide="minus" size="14"></i> ลบแถว</button>
+                                <button onclick="App.f5AddKpiRow()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1"><i data-lucide="plus" size="14"></i> เพิ่มแถว</button>
+                            </div>
+                        </div>
+                        <div class="overflow-auto">
+                            <table class="w-full text-left text-sm min-w-[600px]">
+                                <thead class="table-header">
+                                    <tr class="bg-indigo-50/40">
+                                        <th class="px-3 py-3">ตัวชี้วัดตามแผนพัฒนามหาวิทยาลัยฯ ฉบับที่ 13</th>
+                                        <th class="px-3 py-3 w-32">ค่าเป้าหมาย</th>
+                                        <th class="px-3 py-3 w-28">หน่วยนับ</th>
+                                        <th class="px-3 py-3 w-24">จำนวน</th>
+                                        <th class="w-10 no-print"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="f5-kpi-plan-body" class="divide-y divide-indigo-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] overflow-hidden">
+                        <div class="text-[11px] font-bold text-gray-500 mb-3">ผลที่คาดว่าจะได้รับ (ระยะ 5 ปี)</div>
+                        <div class="overflow-auto">
+                            <table class="w-full text-left text-sm min-w-[900px]">
+                                <thead class="table-header">
+                                    <tr class="bg-indigo-50/40">
+                                        <th class="px-3 py-3">ผลที่คาดว่าจะได้รับ</th>
+                                        <th class="px-3 py-3 w-28">หน่วยนับ</th>
+                                        <th class="px-3 py-3 w-24">ปี งปม. 2566</th>
+                                        <th class="px-3 py-3 w-24">ปี งปม. 2567</th>
+                                        <th class="px-3 py-3 w-24">ปี งปม. 2568</th>
+                                        <th class="px-3 py-3 w-24">ปี งปม. 2569</th>
+                                        <th class="px-3 py-3 w-24">ปี งปม. 2570</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr>
+                                        <td class="px-3 py-3"><input id="f5-result-ult" class="input-flat w-full bg-white" placeholder="ผลลัพธ์บั้นปลาย (Ultimate Outcome)"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-ult-unit" class="input-flat w-full bg-white" placeholder="หน่วย"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-ult-2566" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-ult-2567" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-ult-2568" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-ult-2569" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-ult-2570" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-3"><input id="f5-result-out" class="input-flat w-full bg-white" placeholder="ผลลัพธ์ (Outcome)"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-out-unit" class="input-flat w-full bg-white" placeholder="หน่วย"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-out-2566" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-out-2567" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-out-2568" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-out-2569" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-out-2570" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-3 py-3"><input id="f5-result-prod" class="input-flat w-full bg-white" placeholder="ผลผลิตของโครงการ (Output)"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-prod-unit" class="input-flat w-full bg-white" placeholder="หน่วย"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-prod-2566" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-prod-2567" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-prod-2568" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-prod-2569" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                        <td class="px-3 py-3"><input id="f5-result-prod-2570" class="input-flat w-full bg-white text-center" placeholder="—"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ข้อ 16: เอกสารประมาณราคา -->
+                <div class="space-y-2">
+                    <label class="text-xs font-bold">16. เอกสารประมาณราคาหรือผลการสอบราคา <span class="text-gray-400 font-normal">(แนบมาด้วย)</span></label>
+                    <div class="flex items-center gap-3">
+                        <input id="f5-price-pdf" type="file" accept="application/pdf" class="text-xs">
+                        <span class="text-[10px] font-bold text-red-500">* แนบไฟล์ PDF ขนาดไม่เกิน 20MB</span>
+                    </div>
+                </div>
+
+                <!-- ข้อ 17: การวิเคราะห์ -->
+                <div class="space-y-3">
+                    <label class="text-xs font-bold">17. การวิเคราะห์สิ่งก่อสร้างตามวัตถุประสงค์</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="flex items-center gap-3 p-4 rounded-2xl border border-indigo-50 bg-indigo-50/20 cursor-pointer hover:bg-indigo-50/40">
+                            <input type="radio" name="f5-analysis-case" value="1" class="accent-indigo-600" onchange="App.f5SwitchAnalysisCase(1)">
+                            <span class="font-bold text-sm text-indigo-900">กรณีที่ 1 ทดแทนของเดิม (เพื่อรักษาปริมาณผลผลิต)</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-4 rounded-2xl border border-indigo-50 bg-indigo-50/20 cursor-pointer hover:bg-indigo-50/40">
+                            <input type="radio" name="f5-analysis-case" value="2" class="accent-indigo-600" onchange="App.f5SwitchAnalysisCase(2)">
+                            <span class="font-bold text-sm text-indigo-900">กรณีที่ 2 เพิ่มปริมาณเป้าหมายผลผลิต</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-4 rounded-2xl border border-indigo-50 bg-indigo-50/20 cursor-pointer hover:bg-indigo-50/40">
+                            <input type="radio" name="f5-analysis-case" value="3" class="accent-indigo-600" onchange="App.f5SwitchAnalysisCase(3)">
+                            <span class="font-bold text-sm text-indigo-900">กรณีที่ 3 เพิ่มประสิทธิภาพหรือคุณภาพผลผลิต</span>
+                        </label>
+                        <label class="flex items-center gap-3 p-4 rounded-2xl border border-indigo-50 bg-indigo-50/20 cursor-pointer hover:bg-indigo-50/40">
+                            <input type="radio" name="f5-analysis-case" value="4" class="accent-indigo-600" onchange="App.f5SwitchAnalysisCase(4)">
+                            <span class="font-bold text-sm text-indigo-900">กรณีที่ 4 เพิ่มผลผลิตใหม่</span>
+                        </label>
+                    </div>
+
+                    <div id="f5-analysis-case-1" class="card-main p-8 bg-white border border-indigo-50 rounded-[1.5rem] space-y-6 hidden">
+                        <div class="font-black text-indigo-900 text-lg">กรณีที่ 1 : ทดแทนของเดิม</div>
+                        <div class="space-y-2"><div class="font-bold text-sm">1. ระบุความจำเป็นที่ต้องก่อสร้างเพื่อทดแทนสิ่งก่อสร้างเดิม</div><textarea id="f5a1-q1" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-3"><div class="font-bold text-sm">2. สภาพการใช้งานสิ่งก่อสร้างเดิม</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q2" value="สมบูรณ์" class="mt-1 accent-indigo-600"><span class="text-sm">ใช้งานได้สมบูรณ์</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q2" value="บางส่วน" class="mt-1 accent-indigo-600"><span class="text-sm">ใช้งานได้บางส่วนแต่ไม่สมบูรณ์ (เสื่อมสภาพ/คุณภาพต่ำ/เสียหาย)</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q2" value="ใช้ไม่ได้" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่สามารถใช้งานได้</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q2" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">อื่น ๆ</span></label>
+                            <textarea id="f5a1-q2-detail" class="input-flat w-full text-xs" rows="2" placeholder="เนื่องจาก (อธิบาย)..."></textarea>
+                        </div>
+                        <div class="space-y-3"><div class="font-bold text-sm">3. แนวทางการซ่อมแซมหรือก่อสร้างใหม่</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q3" value="ซ่อมได้คุ้มค่า" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถซ่อมแซมได้และคุ้มค่ากว่าการก่อสร้างใหม่</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q3" value="ซ่อมได้ไม่คุ้ม" class="mt-1 accent-indigo-600"><span class="text-sm">ซ่อมแซมได้ แต่ไม่คุ้มค่า</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q3" value="ซ่อมไม่ได้" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่สามารถซ่อมแซมได้เลย ต้องก่อสร้างใหม่</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q3" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">อื่น ๆ</span></label>
+                            <textarea id="f5a1-q3-detail" class="input-flat w-full text-xs" rows="2" placeholder="เนื่องจาก..."></textarea>
+                        </div>
+                        <div class="space-y-2"><div class="font-bold text-sm">4. สัดส่วนพื้นที่ใช้งานต่อกลุ่มเป้าหมาย (ก่อน-หลัง)</div><textarea id="f5a1-q4" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-3"><div class="font-bold text-sm">5. สามารถใช้งานสิ่งก่อสร้างร่วมกับส่วนราชการอื่น</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q5" value="ได้" class="mt-1 accent-indigo-600"><span class="text-sm">ได้  คือ</span></label>
+                            <textarea id="f5a1-q5-yes" class="input-flat w-full text-xs" rows="2" placeholder="คือ..."></textarea>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q5" value="ไม่ได้" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่ได้ เนื่องจาก</span></label>
+                            <textarea id="f5a1-q5-no" class="input-flat w-full text-xs" rows="2" placeholder="เนื่องจาก..."></textarea>
+                        </div>
+                        <div class="space-y-3"><div class="font-bold text-sm">6. สรุปทางเลือกการก่อสร้างสิ่งก่อสร้างใหม่เพื่อทดแทน</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q6" value="ใช้เดิมได้" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถใช้งานสิ่งก่อสร้างเดิมได้โดยไม่ต้องปรับปรุง</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q6" value="ปรับปรุง" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถใช้งานสิ่งก่อสร้างเดิมได้ โดยต้องปรับปรุงหรือซ่อมแซม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q6" value="ก่อสร้างใหม่" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่สามารถใช้งาน/ไม่คุ้มค่าที่จะซ่อมแซม ต้องก่อสร้างใหม่ทดแทน</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q6" value="ทบทวน" class="mt-1 accent-indigo-600"><span class="text-sm">ขาดการยืนยันข้อมูลที่ชัดเจน ควรให้ตรวจสอบ/ทบทวนใหม่อีกครั้ง</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a1-q6" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">ทางเลือกอื่น ๆ</span></label>
+                            <textarea id="f5a1-q6-other" class="input-flat w-full text-xs" rows="2" placeholder="ระบุ..."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="f5-analysis-case-2" class="card-main p-8 bg-white border border-indigo-50 rounded-[1.5rem] space-y-6 hidden">
+                        <div class="font-black text-indigo-900 text-lg">กรณีที่ 2 : เพิ่มปริมาณเป้าหมายผลผลิต</div>
+                        <div class="space-y-2"><div class="font-bold text-sm">1. มีแผนแสดงการขยาย/เพิ่มปริมาณกลุ่มเป้าหมาย</div><textarea id="f5a2-q1" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-3"><div class="font-bold text-sm">2. การขยาย/เพิ่มปริมาณต้องสอดคล้องกับ</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q2" value="แผนฯ" class="mt-1 accent-indigo-600"><span class="text-sm">แผนฯ13/นโยบาย/แผนปฏิบัติราชการ</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q2" value="ความต้องการ" class="mt-1 accent-indigo-600"><span class="text-sm">ความต้องการหรือสภาพปัญหาของกลุ่มเป้าหมาย</span></label>
+                            <textarea id="f5a2-q2-detail" class="input-flat w-full text-xs" rows="2" placeholder="อธิบาย..."></textarea>
+                        </div>
+                        <div class="space-y-3"><div class="font-bold text-sm">3. สิ่งก่อสร้างเดิมรองรับได้หรือไม่</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q3" value="รองรับได้" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถรองรับได้ โดยไม่ต้องก่อสร้างใหม่</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q3" value="รองรับแต่ต้องปรับ" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถรองรับได้ แต่ต้องปรับปรุงหรือซ่อมแซม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q3" value="ไม่รองรับ" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่สามารถรองรับได้ ต้องก่อสร้างใหม่เพิ่มเติม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q3" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">อื่น ๆ</span></label>
+                            <textarea id="f5a2-q3-detail" class="input-flat w-full text-xs" rows="2" placeholder="เนื่องจาก..."></textarea>
+                        </div>
+                        <div class="space-y-2"><div class="font-bold text-sm">4. สัดส่วนพื้นที่ใช้งานต่อกลุ่มเป้าหมาย (ก่อน-หลัง)</div><textarea id="f5a2-q4" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-2"><div class="font-bold text-sm">5. สามารถใช้งานสิ่งก่อสร้างของส่วนราชการอื่นได้หรือไม่</div><textarea id="f5a2-q5" class="input-flat w-full" rows="2" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-3"><div class="font-bold text-sm">6. สรุปทางเลือก</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q6" value="ใช้เดิมได้" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถใช้งานสิ่งก่อสร้างเดิมที่มีอยู่ หรือสิ่งก่อสร้างลักษณะเดียวกัน</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q6" value="ต้องสร้างใหม่" class="mt-1 accent-indigo-600"><span class="text-sm">ต้องก่อสร้างใหม่เพิ่มเติม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q6" value="ทบทวน" class="mt-1 accent-indigo-600"><span class="text-sm">ขาดการยืนยันข้อมูลที่ชัดเจน ควรให้ตรวจสอบ/ทบทวน</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a2-q6" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">ทางเลือกอื่น ๆ</span></label>
+                            <textarea id="f5a2-q6-other" class="input-flat w-full text-xs" rows="2" placeholder="ระบุ..."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="f5-analysis-case-3" class="card-main p-8 bg-white border border-indigo-50 rounded-[1.5rem] space-y-6 hidden">
+                        <div class="font-black text-indigo-900 text-lg">กรณีที่ 3 : เพิ่มประสิทธิภาพ/คุณภาพผลผลิต</div>
+                        <div class="space-y-2"><div class="font-bold text-sm">1. มีข้อมูลระดับประสิทธิภาพ/คุณภาพของสิ่งก่อสร้างเดิม</div><textarea id="f5a3-q1" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-2"><div class="font-bold text-sm">2. แผนรองรับการเพิ่มประสิทธิภาพ/คุณภาพการปฏิบัติงาน</div><textarea id="f5a3-q2" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-3"><div class="font-bold text-sm">3. สิ่งก่อสร้างเดิมรองรับได้หรือไม่</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a3-q3" value="รองรับได้" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถรองรับได้ โดยไม่ต้องก่อสร้างใหม่</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a3-q3" value="ต้องปรับ" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถรองรับได้ แต่ต้องปรับปรุงหรือซ่อมแซม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a3-q3" value="ต้องสร้างใหม่" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่สามารถรองรับได้ ต้องก่อสร้างใหม่เพิ่มเติม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a3-q3" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">อื่น ๆ</span></label>
+                            <textarea id="f5a3-q3-detail" class="input-flat w-full text-xs" rows="2" placeholder="เนื่องจาก..."></textarea>
+                        </div>
+                        <div class="space-y-2"><div class="font-bold text-sm">4. สัดส่วนพื้นที่ใช้งานต่อกลุ่มเป้าหมาย (ก่อน-หลัง)</div><textarea id="f5a3-q4" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-2"><div class="font-bold text-sm">5. สามารถใช้งานสิ่งก่อสร้างของส่วนราชการอื่นได้หรือไม่</div><textarea id="f5a3-q5" class="input-flat w-full" rows="2" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-3"><div class="font-bold text-sm">6. สรุปทางเลือก</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a3-q6" value="ใช้เดิมได้" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถใช้งานหรือปรับปรุงสิ่งก่อสร้างอื่น ๆ ที่มีอยู่แล้วได้ โดยไม่ต้องก่อสร้างใหม่</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a3-q6" value="ต้องสร้างใหม่" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่สามารถใช้งานสิ่งก่อสร้างอื่น ๆ ที่มีอยู่ได้ ต้องก่อสร้างใหม่เพิ่มเติม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a3-q6" value="ทบทวน" class="mt-1 accent-indigo-600"><span class="text-sm">ขาดการยืนยันข้อมูลที่ชัดเจน ควรให้ตรวจสอบ/ทบทวน</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a3-q6" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">ทางเลือกอื่น ๆ</span></label>
+                            <textarea id="f5a3-q6-other" class="input-flat w-full text-xs" rows="2" placeholder="ระบุ..."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="f5-analysis-case-4" class="card-main p-8 bg-white border border-indigo-50 rounded-[1.5rem] space-y-6 hidden">
+                        <div class="font-black text-indigo-900 text-lg">กรณีที่ 4 : เพิ่มผลผลิตใหม่</div>
+                        <div class="space-y-2"><div class="font-bold text-sm">1. ใช้สิ่งก่อสร้างเพื่อสนับสนุนการเพิ่มผลผลิตใหม่</div><textarea id="f5a4-q1" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-2"><div class="font-bold text-sm">2. มีแผนรองรับการเพิ่มปริมาณกลุ่มเป้าหมาย/ปริมาณงาน (ใหม่)</div><textarea id="f5a4-q2" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-3"><div class="font-bold text-sm">3. การเพิ่มปริมาณกลุ่มเป้าหมาย/ปริมาณงาน (ใหม่) ต้องสอดคล้องกับ</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q3" value="แผนฯ" class="mt-1 accent-indigo-600"><span class="text-sm">แผนพัฒนาเศรษฐกิจฯ/นโยบายความมั่นคงแห่งชาติ/นโยบายรัฐบาล</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q3" value="ความต้องการ" class="mt-1 accent-indigo-600"><span class="text-sm">ความต้องการหรือสภาพปัญหาของกลุ่มเป้าหมาย</span></label>
+                            <textarea id="f5a4-q3-detail" class="input-flat w-full text-xs" rows="2" placeholder="อธิบาย..."></textarea>
+                        </div>
+                        <div class="space-y-3"><div class="font-bold text-sm">4. สิ่งก่อสร้างเดิมรองรับได้หรือไม่</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q4" value="รองรับได้" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถรองรับได้ โดยไม่ต้องก่อสร้างใหม่</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q4" value="ต้องปรับ" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถรองรับได้ แต่ต้องปรับปรุงสิ่งก่อสร้างที่มีอยู่</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q4" value="ต้องสร้างใหม่" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่สามารถรองรับได้ ต้องก่อสร้างใหม่เพิ่มเติม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q4" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">อื่น ๆ</span></label>
+                            <textarea id="f5a4-q4-detail" class="input-flat w-full text-xs" rows="2" placeholder="เนื่องจาก..."></textarea>
+                        </div>
+                        <div class="space-y-2"><div class="font-bold text-sm">5. สัดส่วนพื้นที่ใช้งานต่อกลุ่มเป้าหมาย (ก่อน-หลัง)</div><textarea id="f5a4-q5" class="input-flat w-full" rows="3" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-2"><div class="font-bold text-sm">6. สามารถใช้งานสิ่งก่อสร้างของส่วนราชการอื่นได้หรือไม่</div><textarea id="f5a4-q6" class="input-flat w-full" rows="2" placeholder="อธิบาย..."></textarea></div>
+                        <div class="space-y-3"><div class="font-bold text-sm">7. สรุปทางเลือก</div>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q7" value="ใช้เดิมได้" class="mt-1 accent-indigo-600"><span class="text-sm">สามารถใช้งานหรือปรับปรุงสิ่งก่อสร้างอื่น ๆ ที่มีอยู่ โดยไม่ต้องก่อสร้างใหม่</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q7" value="ต้องสร้างใหม่" class="mt-1 accent-indigo-600"><span class="text-sm">ไม่สามารถใช้งานสิ่งก่อสร้างอื่น ๆ ที่มีอยู่ได้ ต้องก่อสร้างใหม่เพิ่มเติม</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q7" value="ทบทวน" class="mt-1 accent-indigo-600"><span class="text-sm">ขาดการยืนยันข้อมูลที่ชัดเจน ควรให้ตรวจสอบ/ทบทวน</span></label>
+                            <label class="flex items-start gap-3"><input type="radio" name="f5a4-q7" value="อื่นๆ" class="mt-1 accent-indigo-600"><span class="text-sm">ทางเลือกอื่น ๆ</span></label>
+                            <textarea id="f5a4-q7-other" class="input-flat w-full text-xs" rows="2" placeholder="ระบุ..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ข้อ 18: ข้อมูลผู้ประสานงาน -->
+                <div class="space-y-3">
+                    <label class="text-xs font-bold">18. ข้อมูลผู้ประสานงานโครงการ</label>
+                    <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem]">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">ชื่อ – สกุล</label><input id="f5-coord-name" class="input-flat w-full bg-gray-50" placeholder="ชื่อ – สกุล"></div>
+                            <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">ตำแหน่ง</label><input id="f5-coord-position" class="input-flat w-full bg-gray-50" placeholder="ตำแหน่ง"></div>
+                            <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">เบอร์โทรศัพท์ที่ทำงาน</label><input id="f5-coord-phone-office" class="input-flat w-full bg-gray-50" placeholder="เบอร์โทรศัพท์ที่ทำงาน"></div>
+                            <div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500">โทรศัพท์มือถือ</label><input id="f5-coord-phone-mobile" class="input-flat w-full bg-gray-50" placeholder="โทรศัพท์มือถือ"></div>
+                            <div class="space-y-1.5 md:col-span-2"><label class="text-[11px] font-bold text-gray-500">E-mail Address</label><input id="f5-coord-email" class="input-flat w-full bg-gray-50" placeholder="E-mail Address"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ===== ลายเซ็น (แสดงเฉพาะตอน Print) ===== -->
+            <div class="print-only print-signature-block">
+                <div class="print-signature-grid">
+                    <div class="print-signature-col">
+                        <div class="print-signature-line"></div>
+                        <div class="print-signature-name">ผู้เสนอโครงการ</div>
+                        <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                        <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                    </div>
+                    <div class="print-signature-col">
+                        <div class="print-signature-line"></div>
+                        <div class="print-signature-name">หัวหน้าหน่วยงาน</div>
+                        <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                        <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                    </div>
+                    <div class="print-signature-col">
+                        <div class="print-signature-line"></div>
+                        <div class="print-signature-name">ผู้อนุมัติ</div>
+                        <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                        <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ปุ่มล่างสุด ===== -->
+            <div class="no-print mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button onclick="App.saveForm5()" class="flex-1 sm:flex-none sm:w-56 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black shadow-xl flex items-center justify-center gap-3 text-base transition-all">
+                    <i data-lucide="save" class="w-5 h-5"></i> บันทึก
+                </button>
+                <button onclick="App.resetForm5()" class="flex-1 sm:flex-none sm:w-44 bg-white text-gray-500 py-4 rounded-2xl font-bold shadow-sm border border-gray-200 flex items-center justify-center gap-3 text-base hover:bg-gray-50 transition-all">
+                    <i data-lucide="refresh-ccw" class="w-5 h-5"></i> ล้างค่า
+                </button>
+                <button onclick="App.doPrint()" class="flex-1 sm:flex-none sm:w-44 bg-slate-700 hover:bg-slate-800 text-white py-4 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-3 text-base transition-all">
+                    <i data-lucide="printer" class="w-5 h-5"></i> Print / PDF
+                </button>
+            </div>
+
+            <!-- ===== ตารางรายการที่บันทึก ===== -->
+            <div class="no-print mt-12 rounded-[2rem] bg-white border border-indigo-100 shadow-sm overflow-hidden">
+                <div class="flex items-center justify-between gap-4 px-8 py-5 border-b border-indigo-50 bg-indigo-50/40">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center"><i data-lucide="database" class="w-5 h-5 text-white"></i></div>
+                        <div>
+                            <div class="font-black text-indigo-950 text-base">รายการที่บันทึกแล้ว</div>
+                            <div class="text-[11px] font-bold text-gray-400">คลิก ✏️ เพื่อแก้ไข &nbsp;|&nbsp; 🖨️ เพื่อ Print/PDF &nbsp;|&nbsp; 🗑️ เพื่อลบ</div>
+                        </div>
+                    </div>
+                    <button onclick="App.loadForm5Records()" class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-indigo-600 border border-indigo-50 transition-all" title="รีเฟรช">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm min-w-[700px]">
+                        <thead class="table-header">
+                            <tr>
+                                <th class="px-4 py-4 text-center w-12">#</th>
+                                <th class="px-4 py-4">ชื่อรายการ</th>
+                                <th class="px-4 py-4">หน่วยงาน</th>
+                                <th class="px-4 py-4">ประเภทสิ่งก่อสร้าง</th>
+                                <th class="px-4 py-4">ผู้บันทึก</th>
+                                <th class="px-4 py-4">วันที่บันทึก</th>
+                                <th class="px-4 py-4 text-center w-36">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="f5-records-tbody" class="divide-y divide-gray-50">
+                            <tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">กำลังโหลด...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    },
+
     manageForm6Template() {
     return `<div class="card-main p-12 bg-white relative print:p-0 print:shadow-none form4-page">
         <!-- Print-only form code (top-right on paper) -->
@@ -1308,7 +1997,7 @@ adminMiniTableBlock(title, key, headers) {
                 <div class="grid grid-cols-3 divide-x divide-gray-100 bg-white">
                     <div class="f4-cell">
                         <label class="f4-cell-label">หน่วยงาน <span class="text-red-500">*</span></label>
-                        <select id="f6-dept" class="f4-cell-input"></select>
+                        <select id="f6-dept" class="f4-cell-input" onchange="App.f6LoadBranches()"></select>
                     </div>
                     <div class="f4-cell">
                         <label class="f4-cell-label">สาขา / งาน</label>
@@ -1781,6 +2470,30 @@ adminMiniTableBlock(title, key, headers) {
         </div>
     </div>
 
+    <!-- ===== ลายเซ็น (แสดงเฉพาะตอน Print) ===== -->
+    <div class="print-only print-signature-block">
+        <div class="print-signature-grid">
+            <div class="print-signature-col">
+                <div class="print-signature-line"></div>
+                <div class="print-signature-name">ผู้เสนอโครงการ</div>
+                <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+            </div>
+            <div class="print-signature-col">
+                <div class="print-signature-line"></div>
+                <div class="print-signature-name">หัวหน้าหน่วยงาน</div>
+                <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+            </div>
+            <div class="print-signature-col">
+                <div class="print-signature-line"></div>
+                <div class="print-signature-name">ผู้อนุมัติ</div>
+                <div class="print-signature-title">( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )</div>
+                <div class="print-signature-date">วันที่ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; เดือน &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; พ.ศ. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== ปุ่มล่างสุด บันทึก / ล้างค่า / Print ===== -->
     <div class="no-print mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
         <button onclick="App.saveForm6()"
@@ -1791,7 +2504,7 @@ adminMiniTableBlock(title, key, headers) {
             class="flex-1 sm:flex-none sm:w-44 bg-white text-gray-500 py-4 rounded-2xl font-bold shadow-sm border border-gray-200 flex items-center justify-center gap-3 text-base hover:bg-gray-50 transition-all">
             <i data-lucide="refresh-ccw" class="w-5 h-5"></i> ล้างค่า
         </button>
-        <button onclick="window.print()"
+        <button onclick="App.doPrint()"
             class="flex-1 sm:flex-none sm:w-44 bg-slate-700 hover:bg-slate-800 text-white py-4 rounded-2xl font-bold shadow-sm flex items-center justify-center gap-3 text-base transition-all">
             <i data-lucide="printer" class="w-5 h-5"></i> Print / PDF
         </button>
