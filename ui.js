@@ -109,8 +109,8 @@ const UI = {
                         </div>
                     </div>
 
-                    <!-- แถว 2: แหล่งเงินงบประมาณ | อื่นๆ (เต็มแถว) -->
-                    <div class="grid grid-cols-[1fr_1fr] divide-x divide-gray-100 bg-gray-50/50 border-t border-gray-100">
+                    <!-- แถว 2: แหล่งเงินงบประมาณ | อื่นๆ | ประเภทครุภัณฑ์ (3 ช่องในแถวเดียว) -->
+                    <div class="grid grid-cols-3 divide-x divide-gray-100 bg-gray-50/50 border-t border-gray-100">
                         <div class="f4-cell">
                             <label class="f4-cell-label">แหล่งเงินงบประมาณ <span class="text-red-500">*</span></label>
                             <select id="f-budget-source" class="f4-cell-input"></select>
@@ -119,30 +119,57 @@ const UI = {
                             <label class="f4-cell-label text-gray-400">อื่นๆ โปรดระบุ</label>
                             <input id="f-budget-other" placeholder="โปรดระบุ (กรณีเลือกอื่นๆ)" class="f4-cell-input">
                         </div>
-                    </div>
-
-                    <!-- แถว 3: ประเภทครุภัณฑ์ (+ textarea) | ชื่อรายการ + รายการ -->
-                    <div class="grid grid-cols-2 divide-x divide-gray-100 bg-white border-t border-gray-100 items-start">
                         <div class="f4-cell space-y-2">
                             <label class="f4-cell-label">ประเภทครุภัณฑ์ <span class="text-red-500">*</span></label>
                             <select id="f-category" class="f4-cell-input"></select>
                             <textarea id="f-building-note" rows="2" class="f4-cell-input text-xs bg-amber-50 border border-amber-200 text-amber-800 placeholder-amber-400 rounded-xl px-3 py-2 w-full resize-none" placeholder="เฉพาะครุภัณฑ์ประกอบอาคาร โปรดกรอกข้อมูลเพิ่มเติม"></textarea>
-                        </div>
-                        <div class="f4-cell space-y-2">
-                            <div>
-                                <label class="f4-cell-label">รายการ <span class="text-red-500">*</span></label>
-                                <select id="f-item" class="f4-cell-input"></select>
-                            </div>
-                            <div>
-                                <label class="f4-cell-label">ชื่อรายการ <span class="text-red-500">*</span></label>
-                                <input id="f-item-desc" placeholder="ระบุ เช่น คอมพิวเตอร์ / ชุดห้องปฏิบัติการ ฯลฯ" class="f4-cell-input">
-                            </div>
                         </div>
                     </div>
 
                     <!-- hidden fields เก็บค่าเดิม -->
                     <input id="f-building-name" class="hidden" />
                     <input id="f-building-year" class="hidden" />
+                </div>
+
+                <!-- ══ SECTION A2: รายการ + รายละเอียดรายการ (กึ่งกลาง ไม่เต็มจอ) ══ -->
+                <div class="flex justify-center">
+                    <div class="w-full max-w-3xl bg-white border border-gray-100 rounded-[1.5rem] shadow-sm p-6 space-y-4">
+                        <!-- รายการ -->
+                        <div>
+                            <label class="text-xs font-bold text-gray-600">รายการ <span class="text-red-500">*</span></label>
+                            <select id="f-item" class="input-flat w-full mt-1"></select>
+                        </div>
+                        <!-- รายละเอียดรายการ -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label class="text-[11px] font-bold text-gray-500">รายละเอียดรายการ</label>
+                                <div class="flex gap-1 no-print">
+                                    <button type="button" onclick="App.f4SubItemAdd()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-[10px] flex items-center gap-1"><i data-lucide="plus" size="11"></i> เพิ่มแถว</button>
+                                    <button type="button" onclick="App.f4SubItemRemove()" class="bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-bold text-[10px] flex items-center gap-1"><i data-lucide="minus" size="11"></i> ลบแถว</button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-[1fr_72px_88px_96px_96px] gap-2 text-[10px] font-bold text-gray-400 px-1">
+                                <span>ชื่อรายการ</span>
+                                <span class="text-center">จำนวน</span>
+                                <span class="text-center">หน่วยนับ</span>
+                                <span class="text-right">ราคา/ชิ้น (บ.)</span>
+                                <span class="text-right">ยอดรวม (บ.)</span>
+                            </div>
+                            <div id="f4-sub-item-rows" class="space-y-1.5">
+                                <div class="f4-sub-item-row grid gap-2 items-center" style="grid-template-columns: 1fr 72px 88px 96px 96px;">
+                                    <input class="f4si-name input-flat text-xs" placeholder="ชื่อรายการ...">
+                                    <input class="f4si-qty input-flat text-xs text-center" type="number" placeholder="0" oninput="App.f4SubItemCalc()">
+                                    <select class="f4si-unit input-flat text-xs"></select>
+                                    <input class="f4si-price input-flat text-xs text-right" type="number" placeholder="0.00" oninput="App.f4SubItemCalc()">
+                                    <span class="f4si-subtotal text-xs font-bold text-indigo-700 text-right pr-1">0.00</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-center gap-6 border-t border-indigo-100 pt-2 text-xs font-bold text-indigo-800">
+                                <span>รวม <span id="f4si-total-qty" class="text-indigo-600">0</span> ชิ้น</span>
+                                <span>ยอดรวมทั้งสิ้น <span id="f4si-total-amt" class="text-indigo-600">0.00</span> บาท</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ══ SECTION B: ความสอดคล้องยุทธศาสตร์ ══ -->
@@ -233,17 +260,17 @@ const UI = {
                             </div>
                         </div>
 
-                        <!-- Step 7: ตัวชี้วัด (สีเขียวเน้น เลือกได้หลายอัน) -->
+                        <!-- Step 7: ตัวชี้วัด (KPI) + หน่วยนับ + จำนวน ในแถวเดียวกัน -->
                         <div class="f4-strat-row bg-emerald-50/40 border-t border-emerald-100 items-start">
                             <div class="f4-strat-badge bg-emerald-600 text-white">7</div>
                             <div class="f4-strat-label font-black text-emerald-800 pt-2.5">ตัวชี้วัด (KPI)</div>
-                            <div class="f4-strat-field">
+                            <div class="f4-strat-field" style="grid-column: span 2;">
                                 <div id="f-kpi-multi-rows" class="space-y-2"></div>
                                 <div class="flex items-center gap-2 mt-2 no-print">
-                                    <button type="button" onclick="App.f4AddMultiRow('kpi')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                                    <button type="button" onclick="App.f4AddKpiFullRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
                                         <i data-lucide="plus" size="13"></i> เพิ่มแถว
                                     </button>
-                                    <button type="button" onclick="App.f4RemoveMultiRow('kpi')" class="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                                    <button type="button" onclick="App.f4RemoveKpiFullRow()" class="bg-gray-200 hover:bg-gray-300 text-gray-600 px-3 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1">
                                         <i data-lucide="minus" size="13"></i> ลบแถว
                                     </button>
                                 </div>
@@ -251,34 +278,6 @@ const UI = {
                         </div>
 
                     </div><!-- end cascade grid -->
-
-                    <!-- ตารางตัวชี้วัด (+ - แถว) -->
-                    <div class="card-main p-6 bg-indigo-50/20 border border-indigo-100 rounded-[1.5rem] overflow-hidden">
-                        <div class="flex justify-between items-center mb-3">
-                            <div class="text-[11px] font-bold text-gray-500">ตัวชี้วัดตามแผนพัฒนามหาวิทยาลัยฯ <span class="text-gray-400 font-normal">(เพิ่มได้หลายแถว)</span></div>
-                            <div class="flex items-center gap-2 no-print">
-                                <button onclick="App.form4RemoveKpiRows()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2">
-                                    <i data-lucide="minus" size="16"></i> ลบแถว
-                                </button>
-                                <button onclick="App.form4AddKpiRow()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2">
-                                    <i data-lucide="plus" size="16"></i> เพิ่มแถว
-                                </button>
-                            </div>
-                        </div>
-                        <div class="overflow-auto">
-                            <table class="w-full text-left text-sm min-w-[760px]">
-                                <thead class="table-header">
-                                    <tr class="bg-indigo-50/40">
-                                        <th class="px-4 py-3 w-14 text-center">เลือก</th>
-                                        <th class="px-4 py-3">ตัวชี้วัด</th>
-                                        <th class="px-4 py-3 w-52">หน่วยนับ</th>
-                                        <th class="px-4 py-3 w-52">จำนวน</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="f-kpi-rows" class="divide-y divide-indigo-100"></tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- 11-14 (ยังคงเพื่อให้ flow ต่อเนื่องก่อนถึง 15-18) -->
@@ -301,26 +300,38 @@ const UI = {
 
                     <div class="space-y-3">
                         <label class="text-xs font-bold text-red-500">*13. มาตรฐานขั้นต่ำที่ควรมี</label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="flex gap-2 items-center">
-                                <span class="text-xs font-bold text-gray-600 w-40">มาตรฐานขั้นต่ำ</span>
-                                <input id="f-min-std" class="input-flat flex-1 bg-white" placeholder="ระบุ...">
-                                <select id="f-min-std-unit" class="input-flat w-40 bg-white"></select>
-                            </div>
-                            <div class="flex gap-2 items-center">
-                                <span class="text-xs font-bold text-gray-600 w-40">มีอยู่แล้ว จำนวน</span>
-                                <input id="f-have-total" class="input-flat flex-1 bg-white" placeholder="จำนวน">
-                                <select id="f-have-total-unit" class="input-flat w-40 bg-white"></select>
-                            </div>
-                            <div class="flex gap-2 items-center">
-                                <span class="text-xs font-bold text-gray-600 w-40">ใช้การได้ จำนวน</span>
-                                <input id="f-have-ok" class="input-flat flex-1 bg-white" placeholder="จำนวน">
-                                <select id="f-have-ok-unit" class="input-flat w-40 bg-white"></select>
-                            </div>
-                            <div class="flex gap-2 items-center">
-                                <span class="text-xs font-bold text-gray-600 w-40">ชำรุด จำนวน</span>
-                                <input id="f-have-broken" class="input-flat flex-1 bg-white" placeholder="จำนวน">
-                                <select id="f-have-broken-unit" class="input-flat w-40 bg-white"></select>
+                        <div class="flex justify-start">
+                            <div class="space-y-2">
+                                <!-- header row -->
+                                <div class="grid grid-cols-[130px_96px_130px] gap-3 px-1 text-[10px] font-bold text-gray-400">
+                                    <span></span>
+                                    <span class="text-center">จำนวน</span>
+                                    <span class="text-center">หน่วยนับ</span>
+                                </div>
+                                <!-- แถว 1: มาตรฐานขั้นต่ำ -->
+                                <div class="grid grid-cols-[130px_96px_130px] gap-3 items-center">
+                                    <span class="text-xs font-bold text-gray-700">มาตรฐานขั้นต่ำ</span>
+                                    <input id="f-min-std" type="number" min="0" step="1" class="input-flat bg-white text-center" placeholder="0">
+                                    <select id="f-min-std-unit" class="input-flat bg-white"></select>
+                                </div>
+                                <!-- แถว 2: มีอยู่แล้ว -->
+                                <div class="grid grid-cols-[130px_96px_130px] gap-3 items-center">
+                                    <span class="text-xs font-bold text-gray-700">มีอยู่แล้ว</span>
+                                    <input id="f-have-total" type="number" min="0" step="1" class="input-flat bg-white text-center" placeholder="0">
+                                    <select id="f-have-total-unit" class="input-flat bg-white"></select>
+                                </div>
+                                <!-- แถว 3: ใช้การได้ -->
+                                <div class="grid grid-cols-[130px_96px_130px] gap-3 items-center">
+                                    <span class="text-xs font-bold text-gray-700">ใช้การได้</span>
+                                    <input id="f-have-ok" type="number" min="0" step="1" class="input-flat bg-white text-center" placeholder="0">
+                                    <select id="f-have-ok-unit" class="input-flat bg-white"></select>
+                                </div>
+                                <!-- แถว 4: ชำรุด -->
+                                <div class="grid grid-cols-[130px_96px_130px] gap-3 items-center">
+                                    <span class="text-xs font-bold text-gray-700">ชำรุด</span>
+                                    <input id="f-have-broken" type="number" min="0" step="1" class="input-flat bg-white text-center" placeholder="0">
+                                    <select id="f-have-broken-unit" class="input-flat bg-white"></select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -554,34 +565,26 @@ const UI = {
                     <!-- 20 -->
                     <div class="space-y-3">
                         <label class="text-xs font-bold">20. แผนการใช้จ่ายงบประมาณ (หน่วย : ล้านบาท ทศนิยม 3 ตำแหน่ง)</label>
-                        <div class="card-main p-6 bg-white border border-indigo-50 rounded-[1.5rem] overflow-hidden">
+                        <div class="card-main p-4 bg-white border border-indigo-50 rounded-[1.5rem] overflow-hidden">
                             <div class="overflow-auto">
-                                <table class="w-full text-left text-sm min-w-[1100px]">
+                                <table class="w-full text-center text-xs min-w-[900px]">
                                     <thead class="table-header">
                                         <tr class="bg-indigo-50/40">
-                                            <th class="px-4 py-3">รายการ</th>
-                                            <th class="px-3 py-3">ต.ค.</th>
-                                            <th class="px-3 py-3">พ.ย.</th>
-                                            <th class="px-3 py-3">ธ.ค.</th>
-                                            <th class="px-3 py-3">ม.ค.</th>
-                                            <th class="px-3 py-3">ก.พ.</th>
-                                            <th class="px-3 py-3">มี.ค.</th>
-                                            <th class="px-3 py-3">เม.ย.</th>
-                                            <th class="px-3 py-3">พ.ค.</th>
-                                            <th class="px-3 py-3">มิ.ย.</th>
-                                            <th class="px-3 py-3">ก.ค.</th>
-                                            <th class="px-3 py-3">ส.ค.</th>
-                                            <th class="px-3 py-3">ก.ย.</th>
+                                            <th class="px-3 py-2 text-left">รายการ</th>
+                                            <th class="px-2 py-2">ต.ค.</th><th class="px-2 py-2">พ.ย.</th><th class="px-2 py-2">ธ.ค.</th>
+                                            <th class="px-2 py-2">ม.ค.</th><th class="px-2 py-2">ก.พ.</th><th class="px-2 py-2">มี.ค.</th>
+                                            <th class="px-2 py-2">เม.ย.</th><th class="px-2 py-2">พ.ค.</th><th class="px-2 py-2">มิ.ย.</th>
+                                            <th class="px-2 py-2">ก.ค.</th><th class="px-2 py-2">ส.ค.</th><th class="px-2 py-2">ก.ย.</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100">
                                         <tr>
-                                            <td class="px-4 py-3 font-bold text-gray-600">ลงนามสัญญา</td>
-                                            ${['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].map(m => `<td class="px-2 py-2"><input id="f-spend-sign-${m}" class="input-flat w-24 bg-white" placeholder="0.000"></td>`).join('')}
+                                            <td class="px-3 py-2 text-left font-bold text-xs text-gray-600">ลงนามสัญญา</td>
+                                            ${['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].map(m => `<td><input id="f-spend-sign-${m}" type="number" step="0.001" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>`).join('')}
                                         </tr>
                                         <tr>
-                                            <td class="px-4 py-3 font-bold text-gray-600">เบิกจ่ายเงิน</td>
-                                            ${['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].map(m => `<td class="px-2 py-2"><input id="f-spend-disb-${m}" class="input-flat w-24 bg-white" placeholder="0.000"></td>`).join('')}
+                                            <td class="px-3 py-2 text-left font-bold text-xs text-gray-600">เบิกจ่ายเงิน</td>
+                                            ${['oct','nov','dec','jan','feb','mar','apr','may','jun','jul','aug','sep'].map(m => `<td><input id="f-spend-disb-${m}" type="number" step="0.001" class="input-flat w-full bg-white text-center text-xs" placeholder="0.000"></td>`).join('')}
                                         </tr>
                                     </tbody>
                                 </table>

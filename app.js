@@ -277,6 +277,10 @@ const App = {
         } finally {
             this.hideLoader();
         }
+        // โหลดตารางรายการที่บันทึกแล้ว
+        try { await this.loadForm4Records(); } catch(e) { console.warn('loadForm4Records init error', e); }
+        // populate unit dropdowns ในแถวเริ่มต้น
+        this.f4SubItemRefreshUnits();
     },
 
     form4AddKpiRow() {
@@ -482,6 +486,11 @@ const App = {
         const containerId = step === 'kpi' ? 'f-kpi-multi-rows' : `f-${step}-rows`;
         const container = document.getElementById(containerId);
         if (!container) return [];
+        // KPI step: ใช้ class f4-kpi-full-select แทน
+        if (step === 'kpi') {
+            return Array.from(container.querySelectorAll('.f4-kpi-full-select'))
+                .map(s => s.value).filter(Boolean);
+        }
         return Array.from(container.querySelectorAll('select'))
             .map(s => s.value).filter(Boolean);
     },
@@ -493,6 +502,12 @@ const App = {
         if (!container) return;
 
         this._f4MultiOptions[step] = options || [];
+
+        // KPI step: render แบบใหม่ (select + หน่วยนับ + จำนวน)
+        if (step === 'kpi') {
+            this.f4RenderKpiFullRows(options, placeholder);
+            return;
+        }
 
         const prevValues = this.f4GetMultiValues(step);
         const hasData = (options || []).length > 0;
@@ -520,6 +535,97 @@ const App = {
         container.querySelectorAll('select').forEach(s => {
             if (!s.value) s.classList.add('f4-placeholder'); else s.classList.remove('f4-placeholder');
         });
+    },
+
+    // Render KPI rows แบบใหม่: select KPI + select หน่วยนับ + input จำนวน
+    f4RenderKpiFullRows(options, placeholder) {
+        const container = document.getElementById('f-kpi-multi-rows');
+        if (!container) return;
+        const hasData = (options || []).length > 0;
+        const cache = this._f4cache;
+        const units = (cache?.units || []);
+        const buildKpiOpts = (selectedVal = '') => {
+            let h = `<option value="">${hasData ? (placeholder || '— เลือกตัวชี้วัด —') : '— ไม่มีข้อมูล —'}</option>`;
+            (options || []).forEach(o => {
+                h += `<option value="${o.id}" ${o.id === selectedVal ? 'selected' : ''}>${o.name}</option>`;
+            });
+            return h;
+        };
+        const buildUnitOpts = () => {
+            let h = '<option value="">— หน่วยนับ —</option>';
+            units.forEach(u => { h += `<option value="${u.id}">${u.name}</option>`; });
+            return h;
+        };
+        const makeRow = (kpiVal = '', unitVal = '', amountVal = '') => `
+            <div class="flex gap-2 items-center f4-kpi-full-row">
+                <select class="f4-strat-select f4-kpi-full-select flex-1 ${kpiVal ? '' : 'f4-placeholder'}" ${hasData ? '' : 'disabled'}>
+                    ${buildKpiOpts(kpiVal)}
+                </select>
+                <select class="input-flat w-32 text-xs f4-kpi-full-unit">
+                    ${buildUnitOpts()}
+                </select>
+                <input type="number" class="input-flat w-24 text-xs f4-kpi-full-amount" placeholder="จำนวน" value="${amountVal}">
+            </div>
+        `;
+        // ถ้ายังไม่มีแถวให้ใส่ 1 แถวเปล่า
+        if (!container.children.length || container.querySelectorAll('.f4-kpi-full-row').length === 0) {
+            container.innerHTML = makeRow();
+        } else {
+            // อัปเดต select options ทุกแถวโดยคง value เดิมไว้
+            container.querySelectorAll('.f4-kpi-full-row').forEach(row => {
+                const sel = row.querySelector('.f4-kpi-full-select');
+                const prevVal = sel?.value || '';
+                if (sel) {
+                    sel.innerHTML = buildKpiOpts(prevVal);
+                    sel.disabled = !hasData;
+                    if (!sel.value) sel.classList.add('f4-placeholder'); else sel.classList.remove('f4-placeholder');
+                }
+                const unitSel = row.querySelector('.f4-kpi-full-unit');
+                if (unitSel && !unitSel.options.length) unitSel.innerHTML = buildUnitOpts();
+            });
+        }
+        // sync select style
+        container.querySelectorAll('.f4-kpi-full-select').forEach(s => {
+            s.onchange = () => { s.value ? s.classList.remove('f4-placeholder') : s.classList.add('f4-placeholder'); };
+        });
+    },
+
+    f4AddKpiFullRow() {
+        const container = document.getElementById('f-kpi-multi-rows');
+        if (!container) return;
+        const options = this._f4MultiOptions['kpi'] || [];
+        if (!options.length) return alert('ยังไม่มีตัวชี้วัดให้เลือก กรุณาเลือกขั้นตอนก่อนหน้าให้ครบก่อน');
+        const cache = this._f4cache;
+        const units = (cache?.units || []);
+        let kpiHtml = `<option value="">— เลือกตัวชี้วัด —</option>` + options.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+        let unitHtml = `<option value="">— หน่วยนับ —</option>` + units.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+        const div = document.createElement('div');
+        div.className = 'flex gap-2 items-center f4-kpi-full-row';
+        div.innerHTML = `
+            <select class="f4-strat-select f4-kpi-full-select flex-1 f4-placeholder">${kpiHtml}</select>
+            <select class="input-flat w-32 text-xs f4-kpi-full-unit">${unitHtml}</select>
+            <input type="number" class="input-flat w-24 text-xs f4-kpi-full-amount" placeholder="จำนวน">
+        `;
+        div.querySelector('.f4-kpi-full-select').onchange = function() {
+            this.value ? this.classList.remove('f4-placeholder') : this.classList.add('f4-placeholder');
+        };
+        container.appendChild(div);
+    },
+
+    f4RemoveKpiFullRow() {
+        const container = document.getElementById('f-kpi-multi-rows');
+        if (!container) return;
+        const rows = container.querySelectorAll('.f4-kpi-full-row');
+        if (rows.length <= 1) {
+            const sel = rows[0]?.querySelector('.f4-kpi-full-select');
+            const unit = rows[0]?.querySelector('.f4-kpi-full-unit');
+            const amt = rows[0]?.querySelector('.f4-kpi-full-amount');
+            if (sel) { sel.value = ''; sel.classList.add('f4-placeholder'); }
+            if (unit) unit.value = '';
+            if (amt) amt.value = '';
+        } else {
+            rows[rows.length - 1].remove();
+        }
     },
 
     // เพิ่มแถวใหม่ใน multi-row container (ใช้ options ที่ cache ไว้ล่าสุด)
@@ -765,20 +871,25 @@ const App = {
                 substrategyName: document.querySelector('#f-substrategy-rows select')?.selectedOptions?.[0]?.text || '',
                 kpiDim: document.getElementById('f-kpidim')?.value || '',
                 kpiDimName: document.getElementById('f-kpidim')?.selectedOptions?.[0]?.text || '',
-                // ตัวชี้วัด (Step 7) — เลือกได้หลายอัน
-                kpiMains: Array.from(document.querySelectorAll('#f-kpi-multi-rows select')).filter(s => s.value).map(s => ({
-                    id: s.value, name: s.selectedOptions?.[0]?.text || ''
-                })),
-                kpiMain: document.querySelector('#f-kpi-multi-rows select')?.value || '',
-                kpiMainName: document.querySelector('#f-kpi-multi-rows select')?.selectedOptions?.[0]?.text || '',
+                // ตัวชี้วัด (Step 7) — KPI full rows (select + หน่วยนับ + จำนวน)
+                kpiMains: Array.from(document.querySelectorAll('#f-kpi-multi-rows .f4-kpi-full-row')).map(row => ({
+                    id: row.querySelector('.f4-kpi-full-select')?.value || '',
+                    name: row.querySelector('.f4-kpi-full-select')?.selectedOptions?.[0]?.text || '',
+                    unit: row.querySelector('.f4-kpi-full-unit')?.value || '',
+                    unitName: row.querySelector('.f4-kpi-full-unit')?.selectedOptions?.[0]?.text || '',
+                    amount: row.querySelector('.f4-kpi-full-amount')?.value || ''
+                })).filter(r => r.id),
+                kpiMain: document.querySelector('#f-kpi-multi-rows .f4-kpi-full-select')?.value || '',
+                kpiMainName: document.querySelector('#f-kpi-multi-rows .f4-kpi-full-select')?.selectedOptions?.[0]?.text || '',
                 need: document.getElementById('f-need')?.value || '',
                 objective: document.getElementById('f-objective2')?.value || '',
-                kpiRows: Array.from(document.querySelectorAll('#f-kpi-rows tr')).map(tr => {
-                    const k = tr.querySelector('select.f4-kpi-select')?.value || '';
-                    const u = tr.querySelector('select.f4-unit-select')?.value || '';
-                    const n = tr.querySelector('input:not([type="checkbox"])')?.value || '';
-                    return { kpi: k, unit: u, amount: n };
-                }),
+                // รายการย่อย (ชื่อรายการ + หน่วยนับ + จำนวน + ราคา/ชิ้น)
+                subItems: Array.from(document.querySelectorAll('#f4-sub-item-rows .f4-sub-item-row')).map(row => ({
+                    name:  row.querySelector('.f4si-name')?.value  || '',
+                    unit:  row.querySelector('.f4si-unit')?.value  || '',
+                    qty:   row.querySelector('.f4si-qty')?.value   || '',
+                    price: row.querySelector('.f4si-price')?.value || ''
+                })).filter(r => r.name || r.qty || r.price),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 createdBy: currentUser?.username || ''
             };
@@ -793,9 +904,261 @@ const App = {
                 if (hid) hid.value = ref.id;
             }
             alert('บันทึกเรียบร้อย');
+            await this.loadForm4Records();
         } catch (e) {
             console.error('saveForm4 error', e);
             alert('บันทึกไม่สำเร็จ');
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    // ══════════════════════════════════════════════════════════════
+    // FORM 4 (ง.4) — Sub-Items Table (ชื่อรายการย่อย)
+    // ══════════════════════════════════════════════════════════════
+
+    f4SubItemMakeRow(name='', unit='', qty='', price='') {
+        const units = this._f4cache?.units || [];
+        const unitOpts = '<option value="">หน่วยนับ</option>' + units.map(u => `<option value="${u.id}" ${u.id===unit||u.name===unit?'selected':''}>${u.name}</option>`).join('');
+        const sub = (parseFloat(qty||0)*parseFloat(price||0)).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+        const div = document.createElement('div');
+        div.className = 'f4-sub-item-row grid gap-2 items-center';
+        div.style.gridTemplateColumns = '1fr 72px 88px 96px 96px';
+        div.innerHTML = `
+            <input class="f4si-name input-flat text-xs" placeholder="ชื่อรายการ..." value="${name}">
+            <input class="f4si-qty input-flat text-xs text-center" type="number" placeholder="0" value="${qty}">
+            <select class="f4si-unit input-flat text-xs">${unitOpts}</select>
+            <input class="f4si-price input-flat text-xs text-right" type="number" placeholder="0.00" value="${price}">
+            <span class="f4si-subtotal text-xs font-bold text-indigo-700 text-right pr-1">${sub}</span>
+        `;
+        div.querySelector('.f4si-qty').addEventListener('input', () => App.f4SubItemCalc());
+        div.querySelector('.f4si-price').addEventListener('input', () => App.f4SubItemCalc());
+        return div;
+    },
+
+    f4SubItemRefreshUnits() {
+        const units = this._f4cache?.units || [];
+        const optHtml = '<option value="">หน่วยนับ</option>' + units.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+        document.querySelectorAll('#f4-sub-item-rows .f4si-unit').forEach(sel => {
+            const prev = sel.value;
+            sel.innerHTML = optHtml;
+            if (prev) sel.value = prev;
+        });
+    },
+
+    f4SubItemAdd() {
+        const container = document.getElementById('f4-sub-item-rows');
+        if (!container) return;
+        const row = this.f4SubItemMakeRow();
+        container.appendChild(row);
+        this.f4SubItemCalc();
+    },
+
+    f4SubItemRemove() {
+        const container = document.getElementById('f4-sub-item-rows');
+        if (!container) return;
+        const rows = container.querySelectorAll('.f4-sub-item-row');
+        if (rows.length <= 1) {
+            // ล้างค่าแถวแรก
+            rows[0]?.querySelectorAll('input').forEach(i => i.value = '');
+        } else {
+            rows[rows.length - 1].remove();
+        }
+        this.f4SubItemCalc();
+    },
+
+    f4SubItemCalc() {
+        const container = document.getElementById('f4-sub-item-rows');
+        if (!container) return;
+        let totalQty = 0, totalAmt = 0;
+        container.querySelectorAll('.f4-sub-item-row').forEach(row => {
+            const qty   = parseFloat(row.querySelector('.f4si-qty')?.value  || 0);
+            const price = parseFloat(row.querySelector('.f4si-price')?.value || 0);
+            const sub   = qty * price;
+            totalQty += qty;
+            totalAmt += sub;
+            const st = row.querySelector('.f4si-subtotal');
+            if (st) st.textContent = sub.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        });
+        const tq = document.getElementById('f4si-total-qty');
+        const ta = document.getElementById('f4si-total-amt');
+        if (tq) tq.textContent = totalQty.toLocaleString('th-TH');
+        if (ta) ta.textContent = totalAmt.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+
+    f4SubItemLoadRows(subItems) {
+        const container = document.getElementById('f4-sub-item-rows');
+        if (!container) return;
+        container.innerHTML = '';
+        const items = (subItems && subItems.length) ? subItems : [{}];
+        items.forEach(it => container.appendChild(this.f4SubItemMakeRow(it.name||'', it.unit||'', it.qty||'', it.price||'')));
+        this.f4SubItemCalc();
+    },
+
+    // ══════════════════════════════════════════════════════════════
+    // FORM 4 (ง.4) — Records Table, Edit, Print, Delete
+    // ══════════════════════════════════════════════════════════════
+
+    async loadForm4Records() {
+        const tbody = document.getElementById('f4-records-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">กำลังโหลด...</td></tr>';
+        try {
+            const snap = await db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection('form4')
+                .orderBy('createdAt', 'desc').limit(50).get();
+            if (snap.empty) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">ยังไม่มีรายการ</td></tr>';
+                return;
+            }
+            tbody.innerHTML = '';
+            snap.forEach((doc, idx) => {
+                const d = doc.data();
+                const id = doc.id;
+                const cache = this._f4cache;
+                // หา dept name จาก cache (แสดงหน่วยงาน ไม่ใช่สาขา)
+                const deptName = (() => {
+                    if (d.dept) {
+                        const dt = (cache?.depts || []).find(x => x.id === d.dept);
+                        if (dt) return dt.name;
+                    }
+                    return d.deptName || d.dept || '-';
+                })();
+                // หา item name
+                const itemName = (() => {
+                    if (d.item) {
+                        const it = (cache?.items || []).find(x => x.id === d.item);
+                        if (it) return it.name;
+                    }
+                    return d.itemName || d.item || '-';
+                })();
+                // หา plan name
+                const planName = d.planName || d.plan || '-';
+                const date = d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString('th-TH') : '-';
+                const createdBy = d.createdBy || '-';
+
+                tbody.insertAdjacentHTML('beforeend', `
+                    <tr class="hover:bg-indigo-50/30 transition-colors">
+                        <td class="px-4 py-3 text-center text-gray-400 text-xs">${idx + 1}</td>
+                        <td class="px-4 py-3 font-bold text-indigo-900 text-sm">${itemName}</td>
+                        <td class="px-4 py-3 text-xs text-gray-600">${deptName}</td>
+                        <td class="px-4 py-3 text-xs text-gray-500">${planName}</td>
+                        <td class="px-4 py-3 text-xs text-gray-400">${createdBy}</td>
+                        <td class="px-4 py-3 text-xs text-gray-400">${date}</td>
+                        <td class="px-4 py-3 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <button onclick="App.loadForm4ToForm('${id}')"
+                                    title="แก้ไข"
+                                    class="p-2 rounded-xl bg-amber-50 text-amber-500 hover:bg-amber-100 transition-all">
+                                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="App.printForm4('${id}')"
+                                    title="Print / PDF"
+                                    class="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-all">
+                                    <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="App.deleteForm4App('${id}')"
+                                    title="ลบ"
+                                    class="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 transition-all">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `);
+            });
+            lucide.createIcons();
+        } catch (e) {
+            console.error('loadForm4Records error', e);
+            tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-red-400 text-xs font-bold">โหลดข้อมูลไม่สำเร็จ</td></tr>';
+        }
+    },
+
+    async loadForm4ToForm(id) {
+        try {
+            this.showLoader();
+            const docSnap = await db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection('form4').doc(id).get();
+            if (!docSnap.exists) { this.hideLoader(); return alert('ไม่พบข้อมูล'); }
+            const d = docSnap.data();
+
+            // set hidden edit id
+            const hid = document.getElementById('f4-edit-id');
+            if (hid) hid.value = id;
+
+            // fill fields
+            const setVal = (elId, val) => { const el = document.getElementById(elId); if (el) el.value = val || ''; };
+            setVal('f-dept', d.dept);
+            setVal('f-year', d.year);
+            setVal('f-budget-source', d.budgetSource);
+            setVal('f-budget-other', d.budgetOther);
+            setVal('f-item', d.item);
+            setVal('f-item-desc', d.itemDesc);
+            setVal('f-category', d.category);
+            setVal('f-building-name', d.buildingName);
+            setVal('f-building-year', d.buildingYear);
+            setVal('f-need', d.need);
+            setVal('f-objective2', d.objective);
+            setVal('f-min-std', d.minStd);
+            setVal('f-min-std-unit', d.minStdUnit);
+
+            // cascade branch after dept
+            if (d.dept) {
+                await new Promise(r => setTimeout(r, 100));
+                this.form4LoadBranches();
+                await new Promise(r => setTimeout(r, 200));
+                setVal('f-branch', d.branch);
+            }
+
+            // cascade plan chain
+            if (d.plan) {
+                setVal('f-plan', d.plan);
+                this.form4Cascade('plan');
+                await new Promise(r => setTimeout(r, 150));
+                if (d.issue) {
+                    setVal('f-issue', d.issue);
+                    this.form4Cascade('issue');
+                    await new Promise(r => setTimeout(r, 150));
+                    if (d.strategy) {
+                        setVal('f-strategy', d.strategy);
+                        this.form4Cascade('strategy');
+                    }
+                }
+            }
+
+            // โหลด subItems
+            this.f4SubItemLoadRows(d.subItems || []);
+
+            alert('โหลดข้อมูลเข้าฟอร์มแล้ว — แก้ไขแล้วกด "บันทึก" เพื่ออัปเดต');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (e) {
+            console.error('loadForm4ToForm error', e);
+            alert('โหลดข้อมูลไม่สำเร็จ');
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    async printForm4(id) {
+        try {
+            await this.loadForm4ToForm(id);
+            setTimeout(() => window.print(), 500);
+        } catch(e) {
+            console.error('printForm4 error', e);
+        }
+    },
+
+    async deleteForm4App(id) {
+        if (!confirm('ยืนยันการลบรายการนี้?')) return;
+        try {
+            this.showLoader();
+            await db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection('form4').doc(id).delete();
+            alert('ลบสำเร็จ');
+            await this.loadForm4Records();
+        } catch(e) {
+            console.error('deleteForm4App error', e);
+            alert('ลบไม่สำเร็จ');
         } finally {
             this.hideLoader();
         }
