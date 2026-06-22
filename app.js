@@ -1771,6 +1771,7 @@ const App = {
         alert("บันทึกหน่วยนับเรียบร้อย");
         await this.loadAdminTable('units');
         this.renderAdminTable('units');
+        this.renderT3AdminTable('units');
         this.hideLoader();
     },
 
@@ -2542,7 +2543,14 @@ async loadAdminAllTables() {
     ['strat_issues','strat_strategies','strat_dimensions','strat_sub_strategies',
      'strat_kpis','strat_kpis_dim','strat_kpis_kpi','strat_links'].forEach(k => this.renderAdminTable(k));
     // init dropdown ส่วน B + ตาราง 1
-    setTimeout(() => { this._lnkLoadPlans(); this._stratT1Cur=1; this._stratT1Render(); }, 300);
+    setTimeout(() => {
+        this._lnkLoadPlans();
+        this._stratT1Cur=1; this._stratT1Render();
+        this._masterT3Cur=1; this._masterT3Render();
+        // render ตารางที่ 3
+        const t3keys = ['years','budget_types','depts','branches','asset_standards','categories','items','units','sub_categories'];
+        t3keys.forEach(k => this.renderT3AdminTable(k));
+    }, 300);
 },
 
 // ===== ส่วน A: บันทึกรายหัวข้อ =====
@@ -2748,6 +2756,108 @@ _stratT1Render() {
 stratT1Next() { if(this._stratT1Cur < this._stratT1Items.length){this._stratT1Cur++;this._stratT1Render();} },
 stratT1Prev() { if(this._stratT1Cur > 1){this._stratT1Cur--;this._stratT1Render();} },
 
+// ===== ตารางที่ 3: ตั้งต้นข้อมูล navigation =====
+_masterT3Cur: 1,
+_masterT3Items: [
+    {id:'master-t3-p1',  label:'ปีงบประมาณ'},
+    {id:'master-t3-p2',  label:'ประเภทเงินงบประมาณ'},
+    {id:'master-t3-p3',  label:'หน่วยงาน'},
+    {id:'master-t3-p4',  label:'สาขา / งาน'},
+    {id:'master-t3-p5',  label:'มาตรฐานครุภัณฑ์'},
+    {id:'master-t3-p6',  label:'ประเภทครุภัณฑ์'},
+    {id:'master-t3-p7',  label:'รายการ'},
+    {id:'master-t3-p8',  label:'หน่วยนับ'},
+    {id:'master-t3-p9',  label:'หมวดหมู่ย่อย (ประเภทสิ่งของ)'},
+],
+_masterT3Render() {
+    const cur = this._masterT3Cur;
+    this._masterT3Items.forEach((p,i) => {
+        const el = document.getElementById(p.id);
+        if (el) el.classList.toggle('hidden', i+1 !== cur);
+    });
+    lucide.createIcons();
+},
+masterT3Next() { if(this._masterT3Cur < this._masterT3Items.length){ this._masterT3Cur++; this._masterT3Render(); } },
+masterT3Prev() { if(this._masterT3Cur > 1){ this._masterT3Cur--; this._masterT3Render(); } },
+
+// ===== ตารางที่ 3: t3 table pagination helpers (separate from main adm- tables) =====
+_t3PageState: {},
+ensureT3PageState(key) {
+    if (!this._t3PageState[key]) this._t3PageState[key] = { page: 1, limit: 10, searchQuery: '' };
+    return this._t3PageState[key];
+},
+t3AdminFilter(key) {
+    const st = this.ensureT3PageState(key);
+    const el = document.getElementById(`t3-search-${key}`);
+    st.searchQuery = (el?.value || '').trim().toLowerCase();
+    st.page = 1;
+    this.renderT3AdminTable(key);
+},
+t3AdminPrevPage(key) {
+    const st = this.ensureT3PageState(key);
+    if (st.page > 1) st.page -= 1;
+    this.renderT3AdminTable(key);
+},
+t3AdminNextPage(key) {
+    const st = this.ensureT3PageState(key);
+    const data = this.t3GetFilteredData(key);
+    const maxPage = Math.max(1, Math.ceil(data.length / st.limit));
+    if (st.page < maxPage) st.page += 1;
+    this.renderT3AdminTable(key);
+},
+t3GetFilteredData(key) {
+    const st = this.ensureT3PageState(key);
+    const src = adminTableState[key]?.fullData || [];
+    const q = st.searchQuery || '';
+    if (!q) return src;
+    return src.filter(x => {
+        const text = [x.name, x.title, x.year, x.deptName, x.note, x.status].filter(Boolean).join(' ').toLowerCase();
+        return text.includes(q);
+    });
+},
+renderT3AdminTable(key) {
+    const st = this.ensureT3PageState(key);
+    const tbody = document.getElementById(`t3-tbody-${key}`);
+    const pageEl = document.getElementById(`t3-page-${key}`);
+    if (!tbody || !pageEl) return;
+
+    const data = this.t3GetFilteredData(key);
+    const total = data.length;
+    const maxPage = Math.max(1, Math.ceil(total / st.limit));
+    if (st.page > maxPage) st.page = maxPage;
+    const start = (st.page - 1) * st.limit;
+    const pageData = data.slice(start, start + st.limit);
+    pageEl.textContent = `หน้า ${st.page} / ${maxPage}`;
+
+    const iconBtn = (type, onclick) => {
+        const cls = type === 'edit' ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-rose-50 text-rose-600 hover:bg-rose-100';
+        const ic = type === 'edit' ? 'pencil' : 'trash-2';
+        return `<button onclick="${onclick}" class="p-2 rounded-lg ${cls} transition-all"><i data-lucide="${ic}" class="w-4 h-4"></i></button>`;
+    };
+    const col = (txt, cls='') => `<td class="px-6 py-4 ${cls}">${txt ?? '-'}</td>`;
+    const colSm = (txt, isName=false) => `<td class="px-4 py-3${isName ? ' adm-name' : ''}">${txt ?? '-'}</td>`;
+
+    const rows = pageData.map((x, i) => {
+        const idx = start + i + 1;
+        const name = x.name || x.title || x.year || '-';
+        const createdAt = this.adminFmtDate(x.createdAt || x.updatedAt);
+
+        if (key === 'years') {
+            const yearVal = x.year ?? x.name ?? '-';
+            const status = x.status ?? '-';
+            const note = x.note ?? '-';
+            return `<tr>${col(idx)}${col(yearVal,'adm-name')}${col(status)}${col(note)}${col(createdAt)}<td class="px-6 py-4 text-center"><div class="flex items-center justify-center gap-2">${iconBtn('edit',`App.adminEdit('${key}','${x.id}')`)}${iconBtn('del',`App.adminDelete('${key}','${x.id}')`)}</div></td></tr>`;
+        }
+        if (key === 'branches') {
+            return `<tr>${col(idx)}${col(x.deptName||'-')}${col(name)}${col(createdAt)}<td class="px-6 py-4 text-center"><div class="flex items-center justify-center gap-2">${iconBtn('edit',`App.adminEdit('${key}','${x.id}')`)}${iconBtn('del',`App.adminDelete('${key}','${x.id}')`)}</div></td></tr>`;
+        }
+        return `<tr>${col(idx)}${col(name,'adm-name')}${col(createdAt)}<td class="px-6 py-4 text-center"><div class="flex items-center justify-center gap-2">${iconBtn('edit',`App.adminEdit('${key}','${x.id}')`)}${iconBtn('del',`App.adminDelete('${key}','${x.id}')`)}</div></td></tr>`;
+    }).join('');
+
+    tbody.innerHTML = rows || `<tr><td class="px-6 py-8 text-center text-gray-300 italic" colspan="10">ไม่มีข้อมูล</td></tr>`;
+    lucide.createIcons();
+},
+
 
 async refreshAdminStratLinks() {
     // รีเฟรชตาราง "แผนพัฒนาฯ และความเชื่อมโยง" ให้ดึงข้อมูลจริงล่าสุดจากฐานข้อมูล
@@ -2884,7 +2994,7 @@ renderAdminTable(key) {
     };
 
     const col = (txt, cls='') => `<td class="px-6 py-4 ${cls}">${txt ?? '-'}</td>`;
-    const colSm = (txt, cls='') => `<td class="px-4 py-3 text-[12px] ${cls}">${txt ?? '-'}</td>`;
+    const colSm = (txt, isName=false) => `<td class="px-4 py-3${isName ? ' adm-name' : ''}">${txt ?? '-'}</td>`;
 
     const rows = pageData.map((x, i) => {
         const idx = start + i + 1;
@@ -2895,7 +3005,7 @@ renderAdminTable(key) {
         if (key === 'strat_links') {
             return `<tr>
                 ${colSm(idx)}
-                ${colSm(x.planName        || '-', 'font-bold text-indigo-900')}
+                ${colSm(x.planName        || '-', true)}
                 ${colSm(x.issueName       || '-')}
                 ${colSm(x.strategyName    || '-')}
                 ${colSm(x.dimName         || '-')}
@@ -2934,7 +3044,7 @@ renderAdminTable(key) {
             const note = x.note ?? x.remark ?? '-';
             return `<tr>
                 ${colSm(idx)}
-                ${colSm(yearVal, 'font-bold text-indigo-900')}
+                ${colSm(yearVal, true)}
                 ${colSm(status)}
                 ${colSm(note)}
                 ${colSm(createdAt)}
@@ -2950,7 +3060,7 @@ renderAdminTable(key) {
         if (key === 'units') {
             return `<tr>
                 ${colSm(idx)}
-                ${colSm(name, 'font-bold text-indigo-900')}
+                ${colSm(name, true)}
                 ${colSm(createdAt)}
                 <td class="px-4 py-3 text-center">
                     <div class="flex items-center justify-center gap-2">
@@ -2964,7 +3074,7 @@ renderAdminTable(key) {
         if (key === 'strat_issues') {
             return `<tr>
                 ${colSm(idx)}
-                ${colSm(name, 'font-bold text-indigo-900')}
+                ${colSm(name, true)}
                 ${colSm(createdAt)}
                 <td class="px-4 py-3 text-center"><div class="flex items-center justify-center gap-2">
                     ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
@@ -2975,7 +3085,7 @@ renderAdminTable(key) {
         if (key === 'strat_dimensions') {
             return `<tr>
                 ${colSm(idx)}
-                ${colSm(name, 'font-bold text-indigo-900')}
+                ${colSm(name, true)}
                 ${colSm(createdAt)}
                 <td class="px-4 py-3 text-center"><div class="flex items-center justify-center gap-2">
                     ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
@@ -2990,7 +3100,7 @@ renderAdminTable(key) {
             const realKey = (key === 'strat_kpis_dim' || key === 'strat_kpis_kpi') ? 'strat_kpis' : key;
             return `<tr>
                 ${colSm(idx)}
-                ${colSm(name, 'font-bold text-indigo-900')}
+                ${colSm(name, true)}
                 <td class="px-4 py-3">${badge}</td>
                 ${colSm(createdAt)}
                 <td class="px-4 py-3 text-center"><div class="flex items-center justify-center gap-2">
@@ -3024,7 +3134,7 @@ renderAdminTable(key) {
 
         return `<tr>
             ${col(idx)}
-            ${col(name)}
+            ${col(name,'adm-name')}
             ${col(createdAt)}
             <td class="px-6 py-4 text-center">
                 <div class="flex items-center justify-center gap-2">
@@ -3456,6 +3566,7 @@ async adminModalSave(key, id) {
             alert('บันทึกสำเร็จ');
             await this.loadAdminTable(key);
             this.renderAdminTable(key);
+            this.renderT3AdminTable(key);
             this.adminCloseEditModal();
         } catch (e) {
             console.error('adminModalSave error', e);
@@ -3478,6 +3589,7 @@ async adminDelete(key, id) {
             } else {
                 await this.loadAdminTable(key);
                 this.renderAdminTable(key);
+                this.renderT3AdminTable(key);
             }
             return;
         }

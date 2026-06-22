@@ -18,15 +18,52 @@ body { background-color: #ede9fe; }
 .input-flat { background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 0.75rem 1rem; border-radius: 0.85rem; font-size: 0.875rem; outline: none; }
 .input-flat:focus { border-color: #7c3aed; background: #ffffff; box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.05); }
 
-.table-header { background: #ede9fe; color: #5b21b6; font-weight: 700; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.04em; }
+/* ══════════════════════════════════════════
+   หัวตาราง (thead) ทุกตาราง: หนา / เข้ม
+   ══════════════════════════════════════════ */
+.table-header th {
+    font-weight: 800 !important;
+    font-size: 0.68rem !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
 
-/* ตัวอักษรในตาราง — บางเบา */
-tbody td { font-weight: 300; color: #374151; }
+/* ── body ทุกตาราง: บาง / อ่อน ── */
+table tbody tr td {
+    font-weight: 300 !important;
+    font-size: 0.8rem !important;
+}
+/* cell ชื่อหลัก (เน้น) */
+table tbody tr td.adm-name {
+    font-weight: 600 !important;
+}
 
-/* สลับสีแถว เข้ม/อ่อน */
-tbody tr:nth-child(odd)  { background-color: #faf9ff; }
-tbody tr:nth-child(even) { background-color: #f3f0ff; }
-tbody tr:hover { background-color: #ede9fe !important; }
+/* ══ ตารางที่ 1 — โทนม่วง (purple) ══ */
+.tbl-purple thead.table-header { background: #ede9fe; }
+.tbl-purple .table-header th   { color: #3b0764 !important; }
+.tbl-purple tbody tr td        { color: #6d28d9 !important; }
+.tbl-purple tbody tr td.adm-name { color: #3b0764 !important; }
+.tbl-purple tbody tr:nth-child(odd)  { background-color: #f5f3ff; }
+.tbl-purple tbody tr:nth-child(even) { background-color: #ede9fe; }
+.tbl-purple tbody tr:hover           { background-color: #ddd6fe !important; }
+
+/* ══ ตารางที่ 2 — โทนกรม (indigo) ══ */
+.tbl-indigo thead.table-header { background: #e0e7ff; }
+.tbl-indigo .table-header th   { color: #1e1b4b !important; }
+.tbl-indigo tbody tr td        { color: #4338ca !important; }
+.tbl-indigo tbody tr td.adm-name { color: #1e1b4b !important; }
+.tbl-indigo tbody tr:nth-child(odd)  { background-color: #eef2ff; }
+.tbl-indigo tbody tr:nth-child(even) { background-color: #e0e7ff; }
+.tbl-indigo tbody tr:hover           { background-color: #c7d2fe !important; }
+
+/* ══ ตารางที่ 3 — โทนเขียว (emerald) ══ */
+.tbl-emerald thead.table-header { background: #d1fae5; }
+.tbl-emerald .table-header th   { color: #064e3b !important; }
+.tbl-emerald tbody tr td        { color: #059669 !important; }
+.tbl-emerald tbody tr td.adm-name { color: #064e3b !important; }
+.tbl-emerald tbody tr:nth-child(odd)  { background-color: #ecfdf5; }
+.tbl-emerald tbody tr:nth-child(even) { background-color: #d1fae5; }
+.tbl-emerald tbody tr:hover           { background-color: #a7f3d0 !important; }
 
 /* ===== (ง.4) placeholder + layout helpers ===== */
 input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }

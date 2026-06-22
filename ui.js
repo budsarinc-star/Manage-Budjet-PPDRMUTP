@@ -1207,29 +1207,38 @@ const UI = {
             <div class="text-[11px] font-bold text-gray-400">ข้อมูลที่เชื่อมโยงครบ 7 ขั้น (แก้ไข / ลบได้)</div>
         </div>
     </div>
-    ${this.adminTableBlock('แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง','strat_links',['ลำดับ','ฉบับแผน','ยุทธศาสตร์','วัตถุประสงค์ฯ','กลยุทธ์','กลยุทธ์ย่อย','มิติ','ตัวชี้วัด','วันที่บันทึก'])}
+    ${this.adminTableBlock('แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง','strat_links',['ลำดับ','ฉบับแผน','ยุทธศาสตร์','วัตถุประสงค์ฯ','กลยุทธ์','กลยุทธ์ย่อย','มิติ','ตัวชี้วัด','วันที่บันทึก'],'indigo')}
 </div>
 
-<!-- ตารางข้อมูลทั่วไป -->
-<div class="mt-6 rounded-[2.5rem] bg-slate-900/8 border border-slate-200 p-6 md:p-8 space-y-6">
-    <div class="space-y-8">
-    ${this.adminTableBlock('ประเภทเงินงบประมาณ','budget_types',['ลำดับ','ชื่อประเภทเงินงบประมาณ','วันที่บันทึก'])}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        ${this.adminMiniTableBlock('ปีงบประมาณ','years',['ลำดับ','ปี พ.ศ.','สถานะ','หมายเหตุ','วันที่บันทึก'])}
-        ${this.adminMiniTableBlock('หน่วยนับ','units',['ลำดับ','ชื่อหน่วยนับ','วันที่บันทึก'])}
+<!-- ===== ตารางที่ 3: ตั้งต้นข้อมูล (รวมข้อมูลทุกตาราง) ===== -->
+<div class="mt-6 card-main p-8 bg-white shadow-xl border border-emerald-50">
+    <div class="flex items-center justify-between gap-4 mb-5 flex-wrap">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center shrink-0"><i data-lucide="layers-3" class="w-5 h-5 text-white"></i></div>
+            <div>
+                <div class="font-black text-emerald-950 text-base">ตารางที่ 3 — ตั้งต้นข้อมูล</div>
+                <div class="text-[11px] font-bold text-gray-400">รวมข้อมูลทุกรายการ แบ่งหน้า · แก้ไข / ลบได้</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="App.masterT3Prev()" title="ก่อนหน้า" class="w-9 h-9 rounded-xl border border-emerald-100 bg-white hover:bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+            <button onclick="App.masterT3Next()" title="ถัดไป" class="w-9 h-9 rounded-xl border border-emerald-100 bg-white hover:bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+        </div>
     </div>
-    ${this.adminTableBlock('หมวดหมู่ย่อย (ประเภทสิ่งของ)','sub_categories',['ลำดับ','ชื่อหมวดหมู่ย่อย','วันที่บันทึก'])}
-    ${this.adminTableBlock('มาตรฐานครุภัณฑ์','asset_standards',['ลำดับ','ชื่อมาตรฐาน','วันที่บันทึก'])}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        ${this.adminMiniTableBlock('รายการ','items',['ลำดับ','ชื่อรายการ','วันที่บันทึก'])}
-        ${this.adminMiniTableBlock('ประเภทครุภัณฑ์','categories',['ลำดับ','ชื่อประเภท','วันที่บันทึก'])}
-    </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        ${this.adminMiniTableBlock('หน่วยงาน','depts',['ลำดับ','ชื่อหน่วยงาน','วันที่บันทึก'])}
-        ${this.adminMiniTableBlock('สาขา / งาน','branches',['ลำดับ','หน่วยงาน','สาขา/งาน','วันที่บันทึก'])}
-    </div>
+    <div id="master-t3-pages">
+        <!-- หน้าต่างๆ จะถูก inject โดย App.renderMasterT3Pages() -->
+        <div id="master-t3-p1">${this.masterT3TableBlock('ปีงบประมาณ','years',['ลำดับ','ปี พ.ศ.','สถานะ','หมายเหตุ','วันที่บันทึก'])}</div>
+        <div id="master-t3-p2" class="hidden">${this.masterT3TableBlock('ประเภทเงินงบประมาณ','budget_types',['ลำดับ','ชื่อประเภทเงินงบประมาณ','วันที่บันทึก'])}</div>
+        <div id="master-t3-p3" class="hidden">${this.masterT3TableBlock('หน่วยงาน','depts',['ลำดับ','ชื่อหน่วยงาน','วันที่บันทึก'])}</div>
+        <div id="master-t3-p4" class="hidden">${this.masterT3TableBlock('สาขา / งาน','branches',['ลำดับ','หน่วยงาน','สาขา/งาน','วันที่บันทึก'])}</div>
+        <div id="master-t3-p5" class="hidden">${this.masterT3TableBlock('มาตรฐานครุภัณฑ์','asset_standards',['ลำดับ','ชื่อมาตรฐาน','วันที่บันทึก'])}</div>
+        <div id="master-t3-p6" class="hidden">${this.masterT3TableBlock('ประเภทครุภัณฑ์','categories',['ลำดับ','ชื่อประเภท','วันที่บันทึก'])}</div>
+        <div id="master-t3-p7" class="hidden">${this.masterT3TableBlock('รายการ','items',['ลำดับ','ชื่อรายการ','วันที่บันทึก'])}</div>
+        <div id="master-t3-p8" class="hidden">${this.masterT3TableBlock('หน่วยนับ','units',['ลำดับ','ชื่อหน่วยนับ','วันที่บันทึก'])}</div>
+        <div id="master-t3-p9" class="hidden">${this.masterT3TableBlock('หมวดหมู่ย่อย (ประเภทสิ่งของ)','sub_categories',['ลำดับ','ชื่อหมวดหมู่ย่อย','วันที่บันทึก'])}</div>
     </div>
 </div>
+
 <!-- Admin Edit Modal Root -->
 <div id="admin-edit-modal" class="hidden"></div>`;
     },
@@ -1237,29 +1246,30 @@ const UI = {
 
 
 // --- Admin Setup: Table Blocks (แสดงข้อมูลจริง + ค้นหา + แบ่งหน้า) ---
-adminTableBlock(title, key, headers) {
-    return `<div class="card-main p-8 bg-white shadow-2xl border border-purple-50">
+adminTableBlock(title, key, headers, theme='purple') {
+    const accent = theme === 'indigo' ? 'indigo' : 'purple';
+    return `<div class="card-main p-8 bg-white shadow-2xl border border-${accent}-50">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <h5 class="font-black text-indigo-950 flex items-center gap-2">
-                <i data-lucide="table-2" class="w-5 h-5 text-purple-600"></i> ${title}
+                <i data-lucide="table-2" class="w-5 h-5 text-${accent}-600"></i> ${title}
             </h5>
             <div class="flex items-center gap-3">
-                <div class="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-purple-50">
-                    <i data-lucide="search" class="text-purple-400 w-5 h-5 ml-2"></i>
+                <div class="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-${accent}-50">
+                    <i data-lucide="search" class="text-${accent}-400 w-5 h-5 ml-2"></i>
                     <input id="adm-search-${key}" oninput="App.adminFilter('${key}')" placeholder="ค้นหา..." class="input-flat py-2 text-xs border-none bg-transparent focus:ring-0 w-56">
                 </div>
                 <div class="flex gap-2 items-center">
-                    <button onclick="App.adminPrevPage('${key}')" class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-purple-600 transition-all"><i data-lucide="chevron-left" size="20"></i></button>
-                    <div class="bg-purple-600 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md" id="adm-page-${key}">หน้า 1</div>
-                    <button onclick="App.adminNextPage('${key}')" class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-purple-600 transition-all"><i data-lucide="chevron-right" size="20"></i></button>
+                    <button onclick="App.adminPrevPage('${key}')" class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-${accent}-600 transition-all"><i data-lucide="chevron-left" size="20"></i></button>
+                    <div class="bg-${accent}-600 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md" id="adm-page-${key}">หน้า 1</div>
+                    <button onclick="App.adminNextPage('${key}')" class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-${accent}-600 transition-all"><i data-lucide="chevron-right" size="20"></i></button>
                 </div>
             </div>
         </div>
 
-        <div class="overflow-hidden border border-purple-50 rounded-[2rem] bg-white shadow-sm">
-            <table class="w-full text-left text-sm">
+        <div class="overflow-hidden border border-${accent}-50 rounded-[2rem] bg-white shadow-sm">
+            <table class="tbl-${accent} w-full text-left text-sm">
                 <thead class="table-header">
-                    <tr class="bg-purple-50/40">
+                    <tr>
                         ${headers.map(h => `<th class="px-6 py-4">${h}</th>`).join('')}
                         <th class="px-6 py-4 text-center w-40">จัดการ</th>
                     </tr>
@@ -1286,14 +1296,46 @@ adminMiniTableBlock(title, key, headers) {
         </div>
 
         <div class="overflow-hidden border border-purple-50 rounded-[1.5rem] bg-white">
-            <table class="w-full text-left text-sm">
+            <table class="tbl-purple w-full text-left text-sm">
                 <thead class="table-header">
-                    <tr class="bg-purple-50/40">
+                    <tr>
                         ${headers.map(h => `<th class="px-4 py-3 text-[11px]">${h}</th>`).join('')}
                         <th class="px-4 py-3 text-center w-28 text-[11px]">จัดการ</th>
                     </tr>
                 </thead>
                 <tbody id="adm-tbody-${key}" class="divide-y divide-gray-50"></tbody>
+            </table>
+        </div>
+    </div>`;
+},
+
+masterT3TableBlock(title, key, headers) {
+    return `<div class="card-main p-8 bg-white shadow-2xl border border-emerald-50">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <h5 class="font-black text-emerald-900 flex items-center gap-2">
+                <i data-lucide="table-2" class="w-5 h-5 text-emerald-600"></i> ${title}
+            </h5>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm border border-emerald-50">
+                    <i data-lucide="search" class="text-emerald-400 w-5 h-5 ml-2"></i>
+                    <input id="t3-search-${key}" oninput="App.t3AdminFilter('${key}')" placeholder="ค้นหา..." class="input-flat py-2 text-xs border-none bg-transparent focus:ring-0 w-56">
+                </div>
+                <div class="flex gap-2 items-center">
+                    <button onclick="App.t3AdminPrevPage('${key}')" class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-emerald-600 transition-all"><i data-lucide="chevron-left" size="20"></i></button>
+                    <div class="bg-emerald-600 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md" id="t3-page-${key}">หน้า 1</div>
+                    <button onclick="App.t3AdminNextPage('${key}')" class="p-2.5 bg-white rounded-xl shadow-sm text-gray-400 hover:text-emerald-600 transition-all"><i data-lucide="chevron-right" size="20"></i></button>
+                </div>
+            </div>
+        </div>
+        <div class="overflow-hidden border border-emerald-50 rounded-[2rem] bg-white shadow-sm">
+            <table class="tbl-emerald w-full text-left text-sm">
+                <thead class="table-header">
+                    <tr>
+                        ${headers.map(h => `<th class="px-6 py-4">${h}</th>`).join('')}
+                        <th class="px-6 py-4 text-center w-40">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="t3-tbody-${key}" class="divide-y divide-gray-50"></tbody>
             </table>
         </div>
     </div>`;
