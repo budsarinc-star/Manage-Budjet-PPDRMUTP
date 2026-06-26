@@ -1,12 +1,14 @@
 const UI = {
     renderSidebar(activeId, role) {
         const nav = document.getElementById('sidebar-nav');
+        const perm = App.getRolePermissions(role);
         const menus = [
-            { id: 'dashboard', label: '1. Dashboard', icon: 'layout-dashboard', roles: ['admin', 'manager', 'staff_central', 'staff_dept'] },
-            { id: 'manage', label: '2. จัดการข้อมูลครุภัณฑ์', icon: 'package', roles: ['admin', 'staff_central', 'staff_dept'] },
-            { id: 'admin', label: '3. ผู้ดูแลระบบ', icon: 'shield-check', roles: ['admin'] }
+            { id: 'dashboard', label: '1. Dashboard',                icon: 'layout-dashboard', show: perm.dashboard },
+            { id: 'manage',    label: '2. จัดการข้อมูลครุภัณฑ์',   icon: 'package',           show: perm.manage },
+            { id: 'setup',     label: '3. ตั้งต้นข้อมูล',           icon: 'database',          show: perm.admin_setup },
+            { id: 'admin',     label: '4. ผู้ดูแลระบบ',             icon: 'shield-check',      show: perm.admin_users || perm.admin_roles }
         ];
-        nav.innerHTML = menus.filter(m => m.roles.includes(role)).map(m => `
+        nav.innerHTML = menus.filter(m => m.show).map(m => `
             <button onclick="App.navigate('${m.id}')" class="w-full flex items-center gap-3 p-4 rounded-2xl transition-all hover:bg-white/10 group ${activeId === m.id ? 'menu-active' : ''}">
                 <i data-lucide="${m.icon}" class="w-5 h-5 ${activeId === m.id ? 'text-white' : 'text-purple-300'}"></i>
                 <span class="font-bold text-sm ${activeId === m.id ? 'text-white' : 'text-gray-300'}">${m.label}</span>
@@ -1035,48 +1037,34 @@ const UI = {
 <div id="admin-edit-modal" class="hidden"></div>`;
     },
 
-    adminPage(subTab = 'tab1') {
+    adminPage(subTab = 'tab2') {
+        const perm = App.getRolePermissions(currentUser?.role);
+        const showTab2 = perm.admin_users;
+        const showTab3 = perm.admin_roles;
+        let activeTab = subTab;
+        if (activeTab === 'tab2' && !showTab2) activeTab = 'tab3';
+        if (activeTab === 'tab3' && !showTab3) activeTab = 'tab2';
+        let content = activeTab === 'tab2' ? this.adminUserTemplate() : this.adminRolesTemplate();
         return `<div class="animate-in fade-in duration-500">
             <div class="flex gap-4 mb-8 no-print">
-                <button onclick="App.switchSubTab('admin', 'tab1')" class="flex-1 py-4 px-6 rounded-2xl font-bold transition-all ${subTab === 'tab1' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-gray-500 hover:bg-purple-50'}">1. ตั้งต้นข้อมูล</button>
-                <button onclick="App.switchSubTab('admin', 'tab2')" class="flex-1 py-4 px-6 rounded-2xl font-bold transition-all ${subTab === 'tab2' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-gray-500 hover:bg-purple-50'}">2. จัดการผู้ใช้งานระบบ</button>
+                <button onclick="App.switchSubTab('admin', 'tab2')" class="flex-1 py-4 px-6 rounded-2xl font-bold transition-all ${showTab2 ? (activeTab === 'tab2' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-gray-500 hover:bg-purple-50') : 'bg-white text-gray-200 cursor-not-allowed'}" ${showTab2 ? '' : 'disabled'}>1. จัดการผู้ใช้งานระบบ</button>
+                <button onclick="App.switchSubTab('admin', 'tab3')" class="flex-1 py-4 px-6 rounded-2xl font-bold transition-all ${showTab3 ? (activeTab === 'tab3' ? 'bg-purple-600 text-white shadow-lg' : 'bg-white text-gray-500 hover:bg-purple-50') : 'bg-white text-gray-200 cursor-not-allowed'}" ${showTab3 ? '' : 'disabled'}>2. จัดการสิทธิ์</button>
+                <button disabled class="flex-1 py-4 px-6 rounded-2xl font-bold bg-white text-gray-200 cursor-not-allowed opacity-0 pointer-events-none"></button>
             </div>
-            ${subTab === 'tab1' ? this.adminSetupDataTemplate() : this.adminUserTemplate()}
+            ${content}
         </div>
-<!-- Admin Edit Modal Root (เฉพาะหน้า ตั้งต้นข้อมูล) -->
+<div id="admin-edit-modal" class="hidden"></div>`;
+    },
+
+    setupPage() {
+        return `<div class="animate-in fade-in duration-500">
+            ${this.adminSetupDataTemplate()}
+        </div>
 <div id="admin-edit-modal" class="hidden"></div>`;
     },
 
     adminSetupDataTemplate() {
-        return `<div class="space-y-8">
-            <!-- หมวดข้อมูลทั่วไป -->
-            <div class="card-main p-8 relative overflow-hidden shadow-xl bg-white">
-                <div class="rainbow-line absolute top-0 left-0 w-full"></div>
-                <h5 class="font-black text-[#4c1d95] flex items-center gap-2 mb-6"><i data-lucide="layers" size="20"></i> หมวดข้อมูลทั่วไป</h5>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-                    <div class="space-y-4">
-                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-500">ประเภทเงินงบประมาณ</label><div class="flex gap-2"><input id="m-budget-type" placeholder="ใส่ข้อมูลประเภทเงินใหม่" class="input-flat flex-1"><button onclick="App.saveMaster('budget_types', 'm-budget-type')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
-                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-500">รายการ</label><p class="text-[10px] text-gray-400 italic">แบบรายการเดียว หรือ ชุดห้องปฏิบัติการ ฯลฯ</p><div class="flex gap-2"><input id="m-item-name" placeholder="ชื่อรายการ..." class="input-flat flex-1"><button onclick="App.saveMaster('items', 'm-item-name')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
-                    </div>
-                    <div class="space-y-4">
-                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">ปีงบประมาณ</label><div class="flex gap-2"><input id="m-budget-year" placeholder="ใส่ข้อมูลปีงบประมาณ" class="input-flat flex-1"><button onclick="App.saveMaster('years', 'm-budget-year')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
-                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">ประเภท</label><div class="flex gap-2"><input id="m-category" placeholder="รายละเอียดประเภทครุภัณฑ์" class="input-flat flex-1"><button onclick="App.saveMaster('categories', 'm-category')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
-                    </div>
-                    <!-- หน่วยนับ 4 ช่อง ตามสั่ง -->
-                    <div class="md:col-span-2 border-t pt-4 flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">หน่วยนับ</label><div class="flex gap-3"><input id="m-unit-1" placeholder="หน่วย 1" class="input-flat flex-1"><input id="m-unit-2" placeholder="หน่วย 2" class="input-flat flex-1"><input id="m-unit-3" placeholder="หน่วย 3" class="input-flat flex-1"><input id="m-unit-4" placeholder="หน่วย 4" class="input-flat flex-1"><button onclick="App.saveUnits()" class="bg-green-500 text-white px-8 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg"><i data-lucide="save" size="18"></i> บันทึกหน่วยนับ</button></div></div>
-
-                    <!-- เพิ่มเติม: หมวดหมู่ย่อย (ประเภทสิ่งของ) + มาตรฐานครุภัณฑ์ (ไม่ผูกปี) -->
-                    <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">หมวดหมู่ย่อย (ประเภทสิ่งของ)</label><div class="flex gap-2"><input id="m-sub-category" placeholder="ใส่ข้อมูลหมวดหมู่ย่อย" class="input-flat flex-1"><button onclick="App.saveMaster('sub_categories', 'm-sub-category')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
-                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">มาตรฐานครุภัณฑ์</label><div class="flex gap-2"><input id="m-asset-standard" placeholder="ใส่ข้อมูลมาตรฐานครุภัณฑ์" class="input-flat flex-1"><button onclick="App.saveMaster('asset_standards', 'm-asset-standard')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- หมวดโครงสร้างองค์กร (ย้ายพื้นหลังเป็นสีขาว) -->
-            <div class="card-main p-8 shadow-xl bg-white"><h5 class="font-black text-blue-800 flex items-center gap-2 mb-6"><i data-lucide="building-2" size="20"></i> หมวดโครงสร้างองค์กร</h5><div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div class="bg-white p-6 rounded-[2rem] border border-blue-50 shadow-sm"><p class="text-[11px] font-black text-blue-600 mb-4 uppercase tracking-wider">หน่วยงาน</p><div class="flex gap-2"><input id="m-dept-name" placeholder="ใส่ข้อมูลหน่วยงาน" class="input-flat flex-1 border-blue-100"><button onclick="App.saveMaster('depts', 'm-dept-name')" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-md"><i data-lucide="save" size="18"></i> บันทึก</button></div></div><div class="bg-white p-6 rounded-[2rem] border border-blue-50 border-dashed shadow-sm"><p class="text-[11px] font-black text-blue-600 mb-4 uppercase tracking-wider">สาขา / งาน (เชื่อมโยงจากหน่วยงาน)</p><div class="space-y-3"><select id="m-dept-select" class="input-flat w-full border-blue-100 font-bold bg-gray-50"></select><div class="flex gap-2"><input id="m-branch-name" placeholder="ระบุชื่อสาขา/งาน..." class="input-flat flex-1 border-blue-100 italic"><button onclick="App.saveBranch()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg"><i data-lucide="link" size="18"></i> เชื่อมโยง</button></div></div></div></div></div>
-
-            <!-- ===== หมวดข้อมูลยุทธศาสตร์และตัวชี้วัด (ออกแบบใหม่) ===== -->
+        return `<div class="space-y-8"><!-- ===== หมวดข้อมูลยุทธศาสตร์และตัวชี้วัด (ออกแบบใหม่) ===== -->
             <div class="card-main p-8 relative shadow-xl bg-white">
                 <div class="rainbow-line absolute top-0 left-0 w-full h-[3px]"></div>
                 <h5 class="font-black text-purple-800 flex items-center gap-2 mb-1">
@@ -1210,7 +1198,35 @@ const UI = {
     ${this.adminTableBlock('แผนพัฒนามหาวิทยาลัยฯ และความเชื่อมโยง','strat_links',['ลำดับ','ฉบับแผน','ยุทธศาสตร์','วัตถุประสงค์ฯ','กลยุทธ์','กลยุทธ์ย่อย','มิติ','ตัวชี้วัด','วันที่บันทึก'],'indigo')}
 </div>
 
-<!-- ===== ตารางที่ 3: ตั้งต้นข้อมูล (รวมข้อมูลทุกตาราง) ===== -->
+
+            <!-- หมวดข้อมูลทั่วไป -->
+            <div class="card-main p-8 relative overflow-hidden shadow-xl bg-white mt-10">
+                <div class="rainbow-line absolute top-0 left-0 w-full"></div>
+                <h5 class="font-black text-[#4c1d95] flex items-center gap-2 mb-6"><i data-lucide="layers" size="20"></i> หมวดข้อมูลทั่วไป</h5>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                    <div class="space-y-4">
+                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-500">ประเภทเงินงบประมาณ</label><div class="flex gap-2"><input id="m-budget-type" placeholder="ใส่ข้อมูลประเภทเงินใหม่" class="input-flat flex-1"><button onclick="App.saveMaster('budget_types', 'm-budget-type')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
+                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-500">รายการ</label><p class="text-[10px] text-gray-400 italic">แบบรายการเดียว หรือ ชุดห้องปฏิบัติการ ฯลฯ</p><div class="flex gap-2"><input id="m-item-name" placeholder="ชื่อรายการ..." class="input-flat flex-1"><button onclick="App.saveMaster('items', 'm-item-name')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">ปีงบประมาณ</label><div class="flex gap-2"><input id="m-budget-year" placeholder="ใส่ข้อมูลปีงบประมาณ" class="input-flat flex-1"><button onclick="App.saveMaster('years', 'm-budget-year')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
+                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">ประเภท</label><div class="flex gap-2"><input id="m-category" placeholder="รายละเอียดประเภทครุภัณฑ์" class="input-flat flex-1"><button onclick="App.saveMaster('categories', 'm-category')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
+                    </div>
+                    <!-- หน่วยนับ 4 ช่อง ตามสั่ง -->
+                    <div class="md:col-span-2 border-t pt-4 flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">หน่วยนับ</label><div class="flex gap-3"><input id="m-unit-1" placeholder="หน่วย 1" class="input-flat flex-1"><input id="m-unit-2" placeholder="หน่วย 2" class="input-flat flex-1"><input id="m-unit-3" placeholder="หน่วย 3" class="input-flat flex-1"><input id="m-unit-4" placeholder="หน่วย 4" class="input-flat flex-1"><button onclick="App.saveUnits()" class="bg-green-500 text-white px-8 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg"><i data-lucide="save" size="18"></i> บันทึกหน่วยนับ</button></div></div>
+
+                    <!-- เพิ่มเติม: หมวดหมู่ย่อย (ประเภทสิ่งของ) + มาตรฐานครุภัณฑ์ (ไม่ผูกปี) -->
+                    <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">หมวดหมู่ย่อย (ประเภทสิ่งของ)</label><div class="flex gap-2"><input id="m-sub-category" placeholder="ใส่ข้อมูลหมวดหมู่ย่อย" class="input-flat flex-1"><button onclick="App.saveMaster('sub_categories', 'm-sub-category')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
+                        <div class="flex flex-col gap-1.5"><label class="text-xs font-bold text-gray-400">มาตรฐานครุภัณฑ์</label><div class="flex gap-2"><input id="m-asset-standard" placeholder="ใส่ข้อมูลมาตรฐานครุภัณฑ์" class="input-flat flex-1"><button onclick="App.saveMaster('asset_standards', 'm-asset-standard')" class="p-3 bg-purple-600 text-white rounded-xl shadow-md"><i data-lucide="save" size="18"></i></button></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- หมวดโครงสร้างองค์กร (ย้ายพื้นหลังเป็นสีขาว) -->
+            <div class="card-main p-8 shadow-xl bg-white mt-8"><h5 class="font-black text-blue-800 flex items-center gap-2 mb-6"><i data-lucide="building-2" size="20"></i> หมวดโครงสร้างองค์กร</h5><div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div class="bg-white p-6 rounded-[2rem] border border-blue-50 shadow-sm"><p class="text-[11px] font-black text-blue-600 mb-4 uppercase tracking-wider">หน่วยงาน</p><div class="flex gap-2"><input id="m-dept-name" placeholder="ใส่ข้อมูลหน่วยงาน" class="input-flat flex-1 border-blue-100"><button onclick="App.saveMaster('depts', 'm-dept-name')" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-md"><i data-lucide="save" size="18"></i> บันทึก</button></div></div><div class="bg-white p-6 rounded-[2rem] border border-blue-50 border-dashed shadow-sm"><p class="text-[11px] font-black text-blue-600 mb-4 uppercase tracking-wider">สาขา / งาน (เชื่อมโยงจากหน่วยงาน)</p><div class="space-y-3"><select id="m-dept-select" class="input-flat w-full border-blue-100 font-bold bg-gray-50"></select><div class="flex gap-2"><input id="m-branch-name" placeholder="ระบุชื่อสาขา/งาน..." class="input-flat flex-1 border-blue-100 italic"><button onclick="App.saveBranch()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg"><i data-lucide="link" size="18"></i> เชื่อมโยง</button></div></div></div></div></div>
+
+            <!-- ===== ตารางที่ 3: ตั้งต้นข้อมูล (รวมข้อมูลทุกตาราง) ===== -->
 <div class="mt-6 card-main p-8 bg-white shadow-xl border border-emerald-50">
     <div class="flex items-center justify-between gap-4 mb-5 flex-wrap">
         <div class="flex items-center gap-3">
@@ -1227,7 +1243,7 @@ const UI = {
     </div>
     <div id="master-t3-pages">
         <!-- หน้าต่างๆ จะถูก inject โดย App.renderMasterT3Pages() -->
-        <div id="master-t3-p1">${this.masterT3TableBlock('ปีงบประมาณ','years',['ลำดับ','ปี พ.ศ.','สถานะ','หมายเหตุ','วันที่บันทึก'])}</div>
+        <div id="master-t3-p1">${this.masterT3TableBlock('ปีงบประมาณ','years',['ลำดับ','ปี พ.ศ.','เปิด/ปิดใช้งาน','ค่าเริ่มต้น','วันที่บันทึก'])}</div>
         <div id="master-t3-p2" class="hidden">${this.masterT3TableBlock('ประเภทเงินงบประมาณ','budget_types',['ลำดับ','ชื่อประเภทเงินงบประมาณ','วันที่บันทึก'])}</div>
         <div id="master-t3-p3" class="hidden">${this.masterT3TableBlock('หน่วยงาน','depts',['ลำดับ','ชื่อหน่วยงาน','วันที่บันทึก'])}</div>
         <div id="master-t3-p4" class="hidden">${this.masterT3TableBlock('สาขา / งาน','branches',['ลำดับ','หน่วยงาน','สาขา/งาน','วันที่บันทึก'])}</div>
@@ -1342,7 +1358,82 @@ masterT3TableBlock(title, key, headers) {
 },
 
     adminUserTemplate() {
-        return `<div class="card-main relative overflow-hidden p-10"><div class="rainbow-line absolute top-0 left-0 w-full h-1"></div><h3 class="text-[#4c1d95] font-black text-2xl flex items-center gap-3 mb-10"><i data-lucide="users" size="28"></i> จัดการผู้ใช้งานระบบ</h3><div class="bg-[#f5f3ff] p-8 rounded-[2rem] border border-purple-100 shadow-sm mb-12"><div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 items-end"><input type="hidden" id="u-edit-id"><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Username</label><input id="u-user" placeholder="ระบุชื่อผู้ใช้" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Password</label><input id="u-pass" placeholder="ระบุรหัสผ่าน" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ชื่อ-นามสกุล</label><input id="u-fullname" placeholder="ระบุชื่อ-สกุล" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">สิทธิ์การใช้งาน</label><select id="u-role" class="input-flat w-full bg-white font-bold"><option value="admin">ผู้ดูแลระบบ</option><option value="manager">ผู้บริหาร</option><option value="staff_central">เจ้าหน้าที่ส่วนกลาง</option><option value="staff_dept">เจ้าหน้าที่หน่วยงาน</option></select></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ตำแหน่ง</label><input id="u-pos" placeholder="ระบุตำแหน่ง" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">หน่วยงาน</label><select id="u-dept-select" class="input-flat w-full bg-white font-bold"></select></div><div class="lg:col-span-2 flex gap-2 justify-end"><button id="btn-save-user" onclick="App.saveUser()" class="bg-[#10b981] hover:bg-green-600 text-white h-[42px] px-6 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all"><i data-lucide="check-circle" size="18"></i> บันทึก</button><button onclick="App.resetUserForm()" class="bg-gray-100 text-gray-400 h-[42px] w-[42px] rounded-xl flex items-center justify-center hover:bg-gray-200"><i data-lucide="refresh-ccw" size="18"></i></button></div></div></div><div class="overflow-hidden border border-purple-50 rounded-[2rem] bg-white shadow-xl"><table class="w-full text-left text-sm"><thead class="table-header"><tr class="bg-indigo-50/50"><th class="px-6 py-5">Username</th><th class="px-6 py-5">Password</th><th class="px-6 py-5">ชื่อ - นามสกุล</th><th class="px-6 py-5 text-center">สิทธิ์</th><th class="px-6 py-5">ตำแหน่ง</th><th class="px-6 py-5">หน่วยงาน</th><th class="px-6 py-5">วันที่บันทึก</th><th class="px-6 py-5 text-center">จัดการ</th></tr></thead><tbody id="user-list-body" class="divide-y divide-gray-50"></tbody></table></div><div id="user-edit-modal" class="hidden"></div></div>`;
+        const roleOpts = App.getRoleOptions().map(r => `<option value="${r.value}">${r.label}</option>`).join('');
+        return `<div class="card-main relative overflow-hidden p-10"><div class="rainbow-line absolute top-0 left-0 w-full h-1"></div><h3 class="text-[#4c1d95] font-black text-2xl flex items-center gap-3 mb-10"><i data-lucide="users" size="28"></i> จัดการผู้ใช้งานระบบ</h3><div class="bg-[#f5f3ff] p-8 rounded-[2rem] border border-purple-100 shadow-sm mb-12"><div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 items-end"><input type="hidden" id="u-edit-id"><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Username</label><input id="u-user" placeholder="ระบุชื่อผู้ใช้" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">Password</label><input id="u-pass" placeholder="ระบุรหัสผ่าน" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ชื่อ-นามสกุล</label><input id="u-fullname" placeholder="ระบุชื่อ-สกุล" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">สิทธิ์การใช้งาน</label><select id="u-role" class="input-flat w-full bg-white font-bold">${roleOpts}</select></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">ตำแหน่ง</label><input id="u-pos" placeholder="ระบุตำแหน่ง" class="input-flat w-full bg-white"></div><div class="space-y-1.5"><label class="text-[11px] font-bold text-gray-500 ml-1">หน่วยงาน</label><select id="u-dept-select" class="input-flat w-full bg-white font-bold"></select></div><div class="lg:col-span-2 flex gap-2 justify-end"><button id="btn-save-user" onclick="App.saveUser()" class="bg-[#10b981] hover:bg-green-600 text-white h-[42px] px-6 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all"><i data-lucide="check-circle" size="18"></i> บันทึก</button><button onclick="App.resetUserForm()" class="bg-gray-100 text-gray-400 h-[42px] w-[42px] rounded-xl flex items-center justify-center hover:bg-gray-200"><i data-lucide="refresh-ccw" size="18"></i></button></div></div></div><div class="overflow-hidden border border-purple-50 rounded-[2rem] bg-white shadow-xl"><table class="w-full text-left text-sm"><thead class="table-header"><tr class="bg-indigo-50/50"><th class="px-6 py-5">Username</th><th class="px-6 py-5">Password</th><th class="px-6 py-5">ชื่อ - นามสกุล</th><th class="px-6 py-5 text-center">สิทธิ์</th><th class="px-6 py-5">ตำแหน่ง</th><th class="px-6 py-5">หน่วยงาน</th><th class="px-6 py-5">วันที่บันทึก</th><th class="px-6 py-5 text-center">จัดการ</th></tr></thead><tbody id="user-list-body" class="divide-y divide-gray-50"></tbody></table></div><div id="user-edit-modal" class="hidden"></div></div>`;
+    },
+
+    adminRolesTemplate() {
+        return `<div class="space-y-8">
+            <div class="card-main relative overflow-hidden p-10 bg-white shadow-xl">
+                <div class="rainbow-line absolute top-0 left-0 w-full"></div>
+                <h3 class="text-[#4c1d95] font-black text-2xl flex items-center gap-3 mb-2"><i data-lucide="shield-check" size="28"></i> จัดการสิทธิ์การใช้งาน</h3>
+                <p class="text-xs text-gray-400 font-bold mb-8">เพิ่มสิทธิ์ใหม่ หรือแก้ไขการเข้าถึงของสิทธิ์ที่มีอยู่</p>
+
+                <!-- ฟอร์มเพิ่ม/แก้ไขสิทธิ์ -->
+                <div class="bg-[#f5f3ff] p-8 rounded-[2rem] border border-purple-100 shadow-sm mb-10">
+                    <input type="hidden" id="role-edit-key">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="space-y-1.5">
+                            <label class="text-[11px] font-bold text-gray-500 ml-1">ชื่อสิทธิ์ (key ภาษาอังกฤษ ไม่มีช่องว่าง)</label>
+                            <input id="role-key" placeholder="เช่น viewer, data_entry" class="input-flat w-full bg-white" oninput="this.value=this.value.replace(/\\s/g,'_').toLowerCase()">
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-[11px] font-bold text-gray-500 ml-1">ชื่อแสดง (ภาษาไทย)</label>
+                            <input id="role-label" placeholder="เช่น ผู้ดูข้อมูล" class="input-flat w-full bg-white">
+                        </div>
+                    </div>
+                    <p class="text-[11px] font-bold text-gray-500 mb-3 ml-1">การเข้าถึงเมนู / ฟังก์ชัน</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+                        <label class="flex items-center gap-2 p-3 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-400">
+                            <input type="checkbox" id="rp-dashboard" class="accent-purple-600"> <span class="text-xs font-bold">1. Dashboard (ทุกหน่วยงาน)</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-400">
+                            <input type="checkbox" id="rp-dashboard_own" class="accent-purple-600"> <span class="text-xs font-bold">1. Dashboard (เฉพาะหน่วยงานตนเอง)</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-400">
+                            <input type="checkbox" id="rp-manage" class="accent-purple-600"> <span class="text-xs font-bold">2. จัดการข้อมูลครุภัณฑ์</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-400">
+                            <input type="checkbox" id="rp-manage_own_dept" class="accent-purple-600"> <span class="text-xs font-bold">2. จัดการฯ (Dropdown เฉพาะหน่วยงานตนเอง)</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-400">
+                            <input type="checkbox" id="rp-admin_setup" class="accent-purple-600"> <span class="text-xs font-bold">3. ผู้ดูแลระบบ › ตั้งต้นข้อมูล</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-400">
+                            <input type="checkbox" id="rp-admin_users" class="accent-purple-600"> <span class="text-xs font-bold">3. ผู้ดูแลระบบ › จัดการผู้ใช้</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 bg-white rounded-xl border border-purple-100 cursor-pointer hover:border-purple-400">
+                            <input type="checkbox" id="rp-admin_roles" class="accent-purple-600"> <span class="text-xs font-bold">3. ผู้ดูแลระบบ › จัดการสิทธิ์</span>
+                        </label>
+                    </div>
+                    <div class="flex justify-end gap-3">
+                        <button onclick="App.saveRole()" class="bg-[#10b981] hover:bg-green-600 text-white h-[42px] px-6 rounded-xl font-bold text-sm shadow-md flex items-center gap-2 transition-all"><i data-lucide="check-circle" size="18"></i> บันทึกสิทธิ์</button>
+                        <button onclick="App.resetRoleForm()" class="bg-gray-100 text-gray-400 h-[42px] w-[42px] rounded-xl flex items-center justify-center hover:bg-gray-200"><i data-lucide="refresh-ccw" size="18"></i></button>
+                    </div>
+                </div>
+
+                <!-- ตารางแสดงสิทธิ์ทั้งหมด -->
+                <div class="overflow-hidden border border-purple-50 rounded-[2rem] bg-white shadow-xl">
+                    <table class="w-full text-left text-sm">
+                        <thead class="table-header">
+                            <tr class="bg-indigo-50/50">
+                                <th class="px-6 py-5">Key</th>
+                                <th class="px-6 py-5">ชื่อสิทธิ์</th>
+                                <th class="px-6 py-5 text-center">Dashboard</th>
+                                <th class="px-6 py-5 text-center">จัดการข้อมูล</th>
+                                <th class="px-6 py-5 text-center">ตั้งต้นข้อมูล</th>
+                                <th class="px-6 py-5 text-center">จัดการผู้ใช้</th>
+                                <th class="px-6 py-5 text-center">จัดการสิทธิ์</th>
+                                <th class="px-6 py-5 text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roles-list-body" class="divide-y divide-gray-50">
+                            <tr><td colspan="8" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">กำลังโหลด...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
     },
 
     manageForm5Template() {

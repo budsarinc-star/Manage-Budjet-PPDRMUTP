@@ -5,6 +5,44 @@ var tableState = { page: 1, limit: 10, currentType: 'budget_types', fullData: []
 var analysisState = { page: 1, limit: 10, fullData: [], searchQuery: '' };
 var adminTableState = {}; // state ต่อ 1 ตารางในหน้า ผู้ดูแลระบบ > ตั้งต้นข้อมูล
 
+// ============================================================
+// PERMISSION ENGINE — สิทธิ์เริ่มต้น (built-in) + Dynamic
+// ============================================================
+// cache สิทธิ์ทั้งหมดจาก Firestore (โหลดตอน login)
+var _rolesCache = null;
+
+// สิทธิ์เริ่มต้นแบบ built-in (fallback ถ้ายังไม่มีใน Firestore)
+const DEFAULT_ROLES = {
+    admin: {
+        label: 'ผู้ดูแลระบบ',
+        isBuiltIn: true,
+        dashboard: true, dashboard_own: false,
+        manage: true, manage_own_dept: false,
+        admin_setup: true, admin_users: true, admin_roles: true
+    },
+    manager: {
+        label: 'ผู้บริหาร',
+        isBuiltIn: true,
+        dashboard: true, dashboard_own: false,
+        manage: false, manage_own_dept: false,
+        admin_setup: false, admin_users: false, admin_roles: false
+    },
+    staff_central: {
+        label: 'เจ้าหน้าที่ส่วนกลาง',
+        isBuiltIn: true,
+        dashboard: true, dashboard_own: false,
+        manage: true, manage_own_dept: false,
+        admin_setup: true, admin_users: false, admin_roles: false
+    },
+    staff_dept: {
+        label: 'เจ้าหน้าที่หน่วยงาน',
+        isBuiltIn: true,
+        dashboard: false, dashboard_own: true,
+        manage: true, manage_own_dept: true,
+        admin_setup: false, admin_users: false, admin_roles: false
+    }
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
     // แก้ไขระบบลูกตารหัสผ่าน
     const toggleBtn = document.getElementById('toggle-password');
@@ -21,7 +59,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // วันที่และ Login logic
     const dateTxt = document.getElementById('current-date-txt');
-    if (dateTxt) dateTxt.innerText = new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    function updateDateTime() {
+        if (!dateTxt) return;
+        const now = new Date();
+        const datePart = now.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        dateTxt.innerText = `${datePart}  เวลา ${h}.${m} น.`;
+    }
+    updateDateTime();
+    setInterval(updateDateTime, 60000);
     const loginForm = document.getElementById('login-form');
     if (loginForm) loginForm.onsubmit = (e) => { e.preventDefault(); handleLogin(); };
     lucide.createIcons();
@@ -57,12 +104,18 @@ async function handleLogin() {
             username,
             name: data.fullname || data.name || username,
             role: data.role || 'staff_dept',
+            position: data.position || '',
             dept: data.dept || data.org || ''
         };
+
+        // โหลด roles cache จาก Firestore ก่อนแสดง UI
+        await App.loadRolesCache();
 
         document.getElementById('login-container').classList.add('hidden');
         document.getElementById('main-app').classList.remove('hidden');
         document.getElementById('u-name-display').innerText = currentUser.name;
+        const posEl = document.getElementById('u-pos-display');
+        if (posEl) posEl.innerText = currentUser.position;
         document.getElementById('u-dept-display').innerText = currentUser.dept;
         App.navigate('dashboard');
     } catch (err) {
@@ -75,29 +128,109 @@ async function handleLogin() {
 
 
 const App = {
+
+    // ============================================================
+    // PERMISSION HELPERS
+    // ============================================================
+    async loadRolesCache() {
+        try {
+            const snap = await db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection('roles').get();
+            _rolesCache = { ...DEFAULT_ROLES };
+            snap.docs.forEach(doc => {
+                _rolesCache[doc.id] = { ...doc.data(), _firestoreId: doc.id };
+            });
+        } catch (e) {
+            console.warn('loadRolesCache fallback to defaults', e);
+            _rolesCache = { ...DEFAULT_ROLES };
+        }
+    },
+
+    getRolePermissions(roleKey) {
+        const roles = _rolesCache || DEFAULT_ROLES;
+        const r = roles[roleKey] || {};
+        const dashboard = !!(r.dashboard);
+        const dashOwn   = !!(r.dashboard_own);
+        const manage    = !!(r.manage);
+        const manageOwn = !!(r.manage_own_dept);
+        const adminSetup= !!(r.admin_setup);
+        const adminUsers= !!(r.admin_users);
+        const adminRoles= !!(r.admin_roles);
+        return {
+            dashboard:       dashboard || dashOwn,
+            dashboard_all:   dashboard && !dashOwn,
+            dashboard_own:   dashOwn,
+            manage:          manage || manageOwn,
+            manage_own_dept: manageOwn,
+            admin_setup:     adminSetup,
+            admin_users:     adminUsers,
+            admin_roles:     adminRoles,
+            admin_any:       adminUsers || adminRoles
+        };
+    },
+
+    getRoleOptions() {
+        const roles = _rolesCache || DEFAULT_ROLES;
+        return Object.entries(roles).map(([k, v]) => ({ value: k, label: v.label || k }));
+    },
+
+    getRoleLabelByKey(key) {
+        const roles = _rolesCache || DEFAULT_ROLES;
+        return (roles[key]?.label) || key;
+    },
+
     navigate(pageId) {
         const view = document.getElementById('content-view');
         const title = document.getElementById('page-title');
+        const perm = this.getRolePermissions(currentUser.role);
+
+        // Guard: ป้องกันเข้าหน้าที่ไม่มีสิทธิ์
+        if (pageId === 'manage' && !perm.manage)      return;
+        if (pageId === 'setup'  && !perm.admin_setup) return;
+        if (pageId === 'admin'  && !perm.admin_any)   return;
+
         UI.renderSidebar(pageId, currentUser.role);
         switch(pageId) {
-            case 'dashboard': title.innerText = "1. Dashboard"; view.innerHTML = UI.dashboardPage(); break;
+            case 'dashboard':
+                title.innerText = "1. Dashboard";
+                view.innerHTML = UI.dashboardPage();
+                this.initDashboardDropdowns();
+                break;
             case 'manage':
                 title.innerText = "2. จัดการข้อมูลครุภัณฑ์";
                 view.innerHTML = UI.managePage();
-                // init เฉพาะ (ง.4)
                 this.initManageForm4();
                 break;
-            case 'admin': title.innerText = "3. ผู้ดูแลระบบ"; view.innerHTML = UI.adminPage(); this.loadAdminAllTables(); this.fillUserDeptSelect(); this.initAdminSetup(); break;
+            case 'setup':
+                title.innerText = "3. ตั้งต้นข้อมูล";
+                view.innerHTML = UI.setupPage();
+                this.loadAdminAllTables();
+                this.initAdminSetup();
+                break;
+            case 'admin':
+                title.innerText = "4. ผู้ดูแลระบบ";
+                view.innerHTML = UI.adminPage();
+                this.loadUserTable();
+                this.fillUserDeptSelect();
+                break;
         }
         lucide.createIcons();
     },
 
     switchSubTab(page, subId) {
         const view = document.getElementById('content-view');
+        const perm = this.getRolePermissions(currentUser.role);
         if (page === 'admin') {
+            if (subId === 'tab2' && !perm.admin_users) return;
+            if (subId === 'tab3' && !perm.admin_roles) return;
             view.innerHTML = UI.adminPage(subId);
-            if (subId === 'tab1') { this.loadAdminAllTables(); this.initAdminSetup(); }
             if (subId === 'tab2') { this.loadUserTable(); this.fillUserDeptSelect(); }
+            if (subId === 'tab3') { this.loadRolesTable(); }
+        } else if (page === 'dashboard') {
+            view.innerHTML = UI.dashboardPage(subId);
+            this.initDashboardDropdowns();
+            lucide.createIcons();
+            return;
         } else if (page === 'manage') {
             view.innerHTML = UI.managePage(subId);
             if (subId === 'tab1') this.initManageForm4();
@@ -160,8 +293,13 @@ const App = {
             .collection('public').doc('data').collection(name);
 
         try {
-            this.showLoader();
+            // ถ้ามี cache อยู่แล้ว ข้าม fetch และ loader เพื่อไม่ให้หน้าจอแว๊ป
+            let cache = this._f4cache;
+            if (!cache) {
+                this.showLoader();
+            }
 
+            if (!cache) {
             const [depts, branches, budgetSources, items, categories,
                    plans, issues, strategies, dimensions, subStrategies, kpis, units, years, stratLinks] = await Promise.all([
                 getCol('depts').orderBy('name').get(),
@@ -183,7 +321,7 @@ const App = {
             const mapDocs = (snap) => (snap?.docs || []).map(d => ({ id: d.id, ...d.data() }));
             const allKpis = mapDocs(kpis);
 
-            const cache = this._f4cache = {
+            cache = this._f4cache = {
                 depts:         mapDocs(depts),
                 branches:      mapDocs(branches),
                 budgetSources: mapDocs(budgetSources), // ข้อมูลจาก budget_types
@@ -201,6 +339,7 @@ const App = {
                 stratLinks:    mapDocs(stratLinks),
                 _mergedDims:   [],
             };
+            } // end if (!cache)
 
             // ── mergeDuplicatesByName: deduplicate ด้วย name
             //    ชื่อซ้ำ → เหลือ 1 option แต่รวม id ทั้งหมดไว้ใน _allIds
@@ -216,14 +355,38 @@ const App = {
             };
 
             // populate dropdowns ที่ไม่ต้อง cascade
-            setOptions(document.getElementById('f-dept'),          cache.depts);
-            // สาขา/งาน: รีเซ็ตรอให้ผู้ใช้เลือก dept ก่อน
-            const f4BranchEl = document.getElementById('f-branch');
-            if (f4BranchEl) f4BranchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
+            // --- dept: filter ตาม permission ---
+            const perm4 = this.getRolePermissions(currentUser?.role);
+            let deptList = cache.depts;
+            if (perm4.manage_own_dept && currentUser?.dept) {
+                deptList = cache.depts.filter(d => d.name === currentUser.dept || d.id === currentUser.dept);
+            }
+            setOptions(document.getElementById('f-dept'), deptList);
+            // ถ้า manage_own_dept ให้เลือกหน่วยงานตนเองอัตโนมัติ + lock แล้วโหลด branch ทันที
+            if (perm4.manage_own_dept && currentUser?.dept) {
+                const deptSel = document.getElementById('f-dept');
+                if (deptSel) {
+                    deptSel.value = deptList[0]?.id || deptList[0]?.name || '';
+                    deptSel.disabled = true;
+                }
+                // โหลด branch สำหรับหน่วยงานที่ถูก fix ไว้ (ไม่ reset)
+                this.f4LoadBranches();
+            } else {
+                // สาขา/งาน: รีเซ็ตรอให้ผู้ใช้เลือก dept ก่อน (เฉพาะกรณีปกติ)
+                const f4BranchEl = document.getElementById('f-branch');
+                if (f4BranchEl) f4BranchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
+            }
             setOptions(document.getElementById('f-budget-source'), cache.budgetSources);
             setOptions(document.getElementById('f-item'),          cache.items);
             setOptions(document.getElementById('f-category'),      cache.categories);
-            setOptions(document.getElementById('f-year'),          cache.years);
+            const openYears = (cache.years || []).filter(y => y.status === 'เปิดใช้งาน');
+            setOptions(document.getElementById('f-year'), openYears);
+            (() => {
+                const sel = document.getElementById('f-year');
+                if (!sel) return;
+                const main = (cache.years || []).find(y => y.isMain);
+                if (main && !sel.value) { sel.value = main.id; sel.dispatchEvent(new Event('change')); }
+            })();
 
             // ── populate Step 1 (แผนพัฒนา) — ดึงเฉพาะแผนที่มีใน strat_links และ active ──
             const planSel = document.getElementById('f-plan');
@@ -1190,16 +1353,41 @@ const App = {
 
     f5InitDropdowns() {
         const cache = this._f4cache;
+        const perm5 = this.getRolePermissions(currentUser?.role);
         const setOpts = (el, items) => {
             if (!el) return;
             const ph = el.options[0]?.value === '' ? el.options[0].text : '— เลือก —';
             el.innerHTML = `<option value="">${ph}</option>` +
                 (items || []).map(x => `<option value="${x.id}">${x.name||x.id}</option>`).join('');
         };
-        setOpts(document.getElementById('f5-year'), cache?.years);
-        setOpts(document.getElementById('f5-dept'), cache?.depts);
-        const branchEl = document.getElementById('f5-branch');
-        if (branchEl) branchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
+        const openYears5 = (cache?.years || []).filter(y => y.status === 'เปิดใช้งาน');
+        setOpts(document.getElementById('f5-year'), openYears5);
+        (() => {
+            const sel = document.getElementById('f5-year');
+            if (!sel) return;
+            const main = (cache?.years || []).find(y => y.isMain);
+            if (main && !sel.value) sel.value = main.id;
+        })();
+
+        // --- dept: filter ตาม permission ---
+        let deptList5 = cache?.depts || [];
+        if (perm5.manage_own_dept && currentUser?.dept) {
+            deptList5 = deptList5.filter(d => d.name === currentUser.dept || d.id === currentUser.dept);
+        }
+        setOpts(document.getElementById('f5-dept'), deptList5);
+
+        // ถ้า manage_own_dept ให้เลือก + lock + โหลด branch ทันที
+        if (perm5.manage_own_dept && currentUser?.dept) {
+            const deptSel5 = document.getElementById('f5-dept');
+            if (deptSel5) {
+                deptSel5.value = deptList5[0]?.id || deptList5[0]?.name || '';
+                deptSel5.disabled = true;
+            }
+            this.f5LoadBranches();
+        } else {
+            const branchEl = document.getElementById('f5-branch');
+            if (branchEl) branchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
+        }
         const body = document.getElementById('f5-construct-body');
         if (body && body.children.length === 0) { for(let i=0;i<3;i++) this.f5AddConstructRow(); }
         const kpiBody = document.getElementById('f5-kpi-plan-body');
@@ -2844,9 +3032,21 @@ renderT3AdminTable(key) {
 
         if (key === 'years') {
             const yearVal = x.year ?? x.name ?? '-';
-            const status = x.status ?? '-';
-            const note = x.note ?? '-';
-            return `<tr>${col(idx)}${col(yearVal,'adm-name')}${col(status)}${col(note)}${col(createdAt)}<td class="px-6 py-4 text-center"><div class="flex items-center justify-center gap-2">${iconBtn('edit',`App.adminEdit('${key}','${x.id}')`)}${iconBtn('del',`App.adminDelete('${key}','${x.id}')`)}</div></td></tr>`;
+            const isOpen = x.status === 'เปิดใช้งาน';
+            const statusBadge = isOpen
+                ? `<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">● เปิดใช้งาน</span>`
+                : `<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-gray-100 text-gray-400">○ ปิดใช้งาน</span>`;
+            const toggleBtn = isOpen
+                ? `<button onclick="App.adminToggleYear('${x.id}',false)" title="ปิดใช้งาน" class="p-2 rounded-lg bg-emerald-50 text-emerald-500 hover:bg-red-50 hover:text-red-500 transition-all"><i data-lucide="toggle-right" class="w-4 h-4"></i></button>`
+                : `<button onclick="App.adminToggleYear('${x.id}',true)" title="เปิดใช้งาน" class="p-2 rounded-lg bg-gray-50 text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 transition-all"><i data-lucide="toggle-left" class="w-4 h-4"></i></button>`;
+            const isMain = !!x.isMain;
+            const mainBadge = isMain
+                ? `<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">★ ปีหลัก</span>`
+                : `<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-gray-100 text-gray-400">-</span>`;
+            const mainBtn = isMain
+                ? `<button disabled title="ปีหลักปัจจุบัน" class="p-2 rounded-lg bg-amber-50 text-amber-400 cursor-default"><i data-lucide="star" class="w-4 h-4"></i></button>`
+                : `<button onclick="App.setMainYear('${x.id}')" title="ตั้งเป็นปีงบประมาณหลัก" class="p-2 rounded-lg bg-gray-50 text-gray-400 hover:bg-amber-50 hover:text-amber-500 transition-all"><i data-lucide="star" class="w-4 h-4"></i></button>`;
+            return `<tr>${col(idx)}${col(yearVal,'adm-name')}<td class="px-6 py-4">${statusBadge}</td><td class="px-6 py-4">${mainBadge}</td>${col(createdAt)}<td class="px-6 py-4 text-center"><div class="flex items-center justify-center gap-2">${toggleBtn}${mainBtn}${iconBtn('edit',`App.adminEdit('${key}','${x.id}')`)}${iconBtn('del',`App.adminDelete('${key}','${x.id}')`)}</div></td></tr>`;
         }
         if (key === 'branches') {
             return `<tr>${col(idx)}${col(x.deptName||'-')}${col(name)}${col(createdAt)}<td class="px-6 py-4 text-center"><div class="flex items-center justify-center gap-2">${iconBtn('edit',`App.adminEdit('${key}','${x.id}')`)}${iconBtn('del',`App.adminDelete('${key}','${x.id}')`)}</div></td></tr>`;
@@ -3040,16 +3240,30 @@ renderAdminTable(key) {
 
         if (key === 'years') {
             const yearVal = x.year ?? x.name ?? x.title ?? '-';
-            const status = x.status ?? x.state ?? '-';
-            const note = x.note ?? x.remark ?? '-';
+            const isOpen = x.status === 'เปิดใช้งาน';
+            const statusBadge = isOpen
+                ? `<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">● เปิดใช้งาน</span>`
+                : `<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-gray-100 text-gray-400">○ ปิดใช้งาน</span>`;
+            const toggleBtn = isOpen
+                ? `<button onclick="App.adminToggleYear('${x.id}',false)" title="ปิดใช้งาน" class="p-2 rounded-lg bg-emerald-50 text-emerald-500 hover:bg-red-50 hover:text-red-500 transition-all"><i data-lucide="toggle-right" class="w-4 h-4"></i></button>`
+                : `<button onclick="App.adminToggleYear('${x.id}',true)" title="เปิดใช้งาน" class="p-2 rounded-lg bg-gray-50 text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 transition-all"><i data-lucide="toggle-left" class="w-4 h-4"></i></button>`;
+            const isMain = !!x.isMain;
+            const mainBadge = isMain
+                ? `<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">★ ปีหลัก</span>`
+                : `<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-gray-100 text-gray-400">-</span>`;
+            const mainBtn = isMain
+                ? `<button disabled title="ปีหลักปัจจุบัน" class="p-2 rounded-lg bg-amber-50 text-amber-400 cursor-default"><i data-lucide="star" class="w-4 h-4"></i></button>`
+                : `<button onclick="App.setMainYear('${x.id}')" title="ตั้งเป็นปีงบประมาณหลัก" class="p-2 rounded-lg bg-gray-50 text-gray-400 hover:bg-amber-50 hover:text-amber-500 transition-all"><i data-lucide="star" class="w-4 h-4"></i></button>`;
             return `<tr>
                 ${colSm(idx)}
                 ${colSm(yearVal, true)}
-                ${colSm(status)}
-                ${colSm(note)}
+                <td class="px-4 py-3">${statusBadge}</td>
+                <td class="px-4 py-3">${mainBadge}</td>
                 ${colSm(createdAt)}
                 <td class="px-4 py-3 text-center">
                     <div class="flex items-center justify-center gap-2">
+                        ${toggleBtn}
+                        ${mainBtn}
                         ${iconBtn('edit', `App.adminEdit('${key}','${x.id}')`)}
                         ${iconBtn('del', `App.adminDelete('${key}','${x.id}')`)}
                     </div>
@@ -3157,6 +3371,30 @@ adminCloseEditModal() {
     document.body.classList.remove('overflow-hidden');
 },
 
+async setMainYear(id) {
+    try {
+        // ล้าง isMain ของทุกปีก่อน แล้ว set เฉพาะปีที่เลือก
+        const st = adminTableState['years'];
+        const colRef = db.collection('artifacts').doc(appId)
+            .collection('public').doc('data').collection('years');
+        const batch = db.batch();
+        if (st?.fullData) {
+            st.fullData.forEach(r => {
+                if (r.isMain) batch.update(colRef.doc(r.id), { isMain: false });
+                r.isMain = (r.id === id);
+            });
+        }
+        batch.update(colRef.doc(id), { isMain: true, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        await batch.commit();
+        // re-render ทั้ง renderAdminTable และ renderT3AdminTable
+        this.renderAdminTable('years');
+        this.renderT3AdminTable('years');
+    } catch(e) {
+        console.error('setMainYear error', e);
+        alert('ตั้งปีหลักไม่สำเร็จ');
+    }
+},
+
 async adminTogglePlan(id, active) {
     try {
         // optimistic: อัปเดต state ทันที แล้ว render เลย
@@ -3180,6 +3418,33 @@ async adminTogglePlan(id, active) {
         alert('บันทึกไม่สำเร็จ');
         await this.loadAdminTable('strat_plans');
         this.renderAdminTable('strat_plans');
+    }
+},
+
+async adminToggleYear(id, open) {
+    const newStatus = open ? 'เปิดใช้งาน' : 'ปิดใช้งาน';
+    try {
+        const st = adminTableState['years'];
+        if (st?.fullData) {
+            const row = st.fullData.find(r => r.id === id);
+            if (row) row.status = newStatus;
+        }
+        this.renderAdminTable('years');
+        this.renderT3AdminTable('years');
+        await this.getAdminColRef('years').doc(id).update({
+            status: newStatus,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        if (this._f4cache) {
+            const row = (this._f4cache.years || []).find(r => r.id === id);
+            if (row) row.status = newStatus;
+        }
+    } catch(e) {
+        console.error('adminToggleYear error', e);
+        alert('บันทึกไม่สำเร็จ');
+        await this.loadAdminTable('years');
+        this.renderAdminTable('years');
+        this.renderT3AdminTable('years');
     }
 },
 
@@ -3767,6 +4032,251 @@ async fillDeptSelectForBranches() {
     },
 
     // --- User Ops ---
+    // ============================================================
+    // DASHBOARD — init dropdowns พร้อม permission filter
+    // ============================================================
+    async initDashboardDropdowns() {
+        try {
+            const perm = this.getRolePermissions(currentUser?.role);
+            const getCol = (name) => db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection(name);
+
+            const [depts, budgetTypes, years] = await Promise.all([
+                getCol('depts').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('budget_types').orderBy('name').get().catch(() => ({ docs: [] })),
+                getCol('years').orderBy('name').get().catch(() => ({ docs: [] }))
+            ]);
+
+            const mapDocs = (snap) => (snap?.docs || []).map(d => ({ id: d.id, ...d.data() }));
+            let deptList = mapDocs(depts);
+
+            // ถ้า dashboard_own ให้กรองเฉพาะหน่วยงานตนเอง + lock
+            if (perm.dashboard_own && !perm.dashboard_all && currentUser?.dept) {
+                deptList = deptList.filter(d => d.name === currentUser.dept || d.id === currentUser.dept);
+            }
+
+            const budgetSel = document.getElementById('dash-budget-type');
+            const deptSel   = document.getElementById('dash-dept-name');
+            const yearSel   = document.getElementById('dash-year');
+
+            if (budgetSel) {
+                budgetSel.innerHTML = '<option value="">— ทั้งหมด —</option>' +
+                    mapDocs(budgetTypes).map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+            }
+            if (deptSel) {
+                deptSel.innerHTML = (perm.dashboard_own ? '' : '<option value="">— ทุกหน่วยงาน —</option>') +
+                    deptList.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                if (perm.dashboard_own && currentUser?.dept) {
+                    deptSel.value = deptList[0]?.id || '';
+                    deptSel.disabled = true;
+                }
+            }
+            if (yearSel) {
+                yearSel.innerHTML = '<option value="">— ทุกปี —</option>' +
+                    mapDocs(years).map(y => `<option value="${y.id}">${y.name}</option>`).join('');
+            }
+
+            // populate compare dropdowns ด้วย
+            ['comp-dept-1','comp-dept-2'].forEach(id => {
+                const s = document.getElementById(id);
+                if (!s) return;
+                s.innerHTML = (perm.dashboard_own ? '' : '<option value="">— ทุกหน่วยงาน —</option>') +
+                    deptList.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                if (perm.dashboard_own && currentUser?.dept) { s.value = deptList[0]?.id || ''; s.disabled = true; }
+            });
+            ['comp-budget-1','comp-budget-2'].forEach(id => {
+                const s = document.getElementById(id);
+                if (!s) return;
+                s.innerHTML = '<option value="">— ทั้งหมด —</option>' +
+                    mapDocs(budgetTypes).map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+            });
+            const yr = mapDocs(years);
+            ['year-start','year-end','comp-year-a','comp-year-b'].forEach(id => {
+                const s = document.getElementById(id);
+                if (!s) return;
+                s.innerHTML = '<option value="">— เลือกปี —</option>' +
+                    yr.map(y => `<option value="${y.id}">${y.name}</option>`).join('');
+            });
+        } catch (e) {
+            console.warn('initDashboardDropdowns error', e);
+        }
+    },
+
+    async loadDashboardData() {
+        // ฟังก์ชัน stub — เรียกใช้เมื่อกดปุ่ม "แสดงผลข้อมูล"
+        // สามารถขยายต่อเพื่อ query และ render chart จริงๆ ได้
+        const budgetType = document.getElementById('dash-budget-type')?.value || '';
+        const deptId     = document.getElementById('dash-dept-name')?.value || '';
+        const year       = document.getElementById('dash-year')?.value || '';
+        try {
+            this.showLoader();
+            let q = db.collection('artifacts').doc(appId)
+                .collection('public').doc('data').collection('form4');
+            // filter
+            if (year)       q = q.where('year', '==', year);
+            if (budgetType) q = q.where('budgetSource', '==', budgetType);
+            // dashboard_own: force dept filter
+            const perm = this.getRolePermissions(currentUser?.role);
+            let filterDept = deptId;
+            if (perm.dashboard_own && !perm.dashboard_all && currentUser?.dept) {
+                filterDept = currentUser.dept;
+            }
+            if (filterDept) q = q.where('dept', '==', filterDept);
+            const snap = await q.get().catch(() => ({ docs: [] }));
+            const rows = (snap?.docs || []).map(d => ({ id: d.id, ...d.data() }));
+            // render table body
+            const tbody = document.getElementById('dash-table-body');
+            if (tbody) {
+                tbody.innerHTML = rows.length
+                    ? rows.map(r => `<tr class="hover:bg-indigo-50/30">
+                        <td class="px-6 py-3 font-bold text-indigo-700">${r.deptName || r.dept || '-'}</td>
+                        <td class="px-6 py-3">${r.budgetSourceName || r.budgetSource || '-'}</td>
+                        <td class="px-6 py-3">${r.yearName || r.year || '-'}</td>
+                        <td class="px-6 py-3">${r.branchName || r.branch || '-'}</td>
+                        <td class="px-6 py-3">${r.itemName || r.item || '-'}</td>
+                        <td class="px-6 py-3 text-right font-bold">${Number(r.totalAmount||0).toLocaleString('th-TH')}</td>
+                    </tr>`).join('')
+                    : `<tr><td colspan="6" class="px-6 py-8 text-center text-gray-400 text-xs font-bold">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</td></tr>`;
+            }
+        } catch(e) {
+            console.error('loadDashboardData error', e);
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    // ============================================================
+    // ROLE MANAGEMENT (Dynamic Roles)
+    // ============================================================
+    async loadRolesTable() {
+        const tbody = document.getElementById('roles-list-body');
+        if (!tbody) return;
+        await this.loadRolesCache();
+        const roles = _rolesCache || DEFAULT_ROLES;
+        const iconBtn = (type, onclick, disabled=false) => {
+            if (disabled) return `<button disabled class="p-2 rounded-lg bg-gray-50 text-gray-300 cursor-not-allowed"><i data-lucide="${type === 'edit' ? 'pencil' : 'trash-2'}" class="w-4 h-4"></i></button>`;
+            const cls = type === 'edit'
+                ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                : 'bg-rose-50 text-rose-600 hover:bg-rose-100';
+            const ic = type === 'edit' ? 'pencil' : 'trash-2';
+            return `<button onclick="${onclick}" class="p-2 rounded-lg ${cls} transition-all"><i data-lucide="${ic}" class="w-4 h-4"></i></button>`;
+        };
+        const tick = (val) => val
+            ? `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-600"><i data-lucide="check" class="w-3 h-3"></i></span>`
+            : `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-300"><i data-lucide="minus" class="w-3 h-3"></i></span>`;
+        tbody.innerHTML = Object.entries(roles).map(([key, r]) => {
+            const isBuiltIn = !!r.isBuiltIn;
+            const dashDisp = r.dashboard ? 'ทุกหน่วยงาน' : (r.dashboard_own ? 'หน่วยงานตนเอง' : '-');
+            const dashColor = r.dashboard ? 'bg-indigo-100 text-indigo-700' : (r.dashboard_own ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-400');
+            return `<tr class="hover:bg-purple-50/30 transition-all">
+                <td class="px-6 py-4 font-mono text-purple-700 font-bold text-xs">${key}</td>
+                <td class="px-6 py-4 font-bold">${r.label || key}${isBuiltIn ? ' <span class="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-bold ml-1">ค่าเริ่มต้น</span>' : ''}</td>
+                <td class="px-6 py-4 text-center"><span class="text-[10px] font-bold px-2 py-1 rounded-full ${dashColor}">${dashDisp}</span></td>
+                <td class="px-6 py-4 text-center">${tick(r.manage)}${r.manage_own_dept ? '<span class="text-[10px] text-sky-600 font-bold ml-1">(หน่วยงานตนเอง)</span>' : ''}</td>
+                <td class="px-6 py-4 text-center">${tick(r.admin_setup)}</td>
+                <td class="px-6 py-4 text-center">${tick(r.admin_users)}</td>
+                <td class="px-6 py-4 text-center">${tick(r.admin_roles)}</td>
+                <td class="px-6 py-4 text-center">
+                    <div class="flex justify-center gap-2">
+                        ${iconBtn('edit', `App.editRole('${key}')`)}
+                        ${iconBtn('del', `App.deleteRole('${key}')`, isBuiltIn)}
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+        lucide.createIcons();
+    },
+
+    editRole(key) {
+        const roles = _rolesCache || DEFAULT_ROLES;
+        const r = roles[key];
+        if (!r) return;
+        const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+        const setChk = (id, val) => { const el = document.getElementById(id); if(el) el.checked = !!val; };
+        setEl('role-edit-key', key);
+        setEl('role-key', key);
+        setEl('role-label', r.label || '');
+        // ถ้า built-in ล็อก key ไม่ให้แก้
+        const keyEl = document.getElementById('role-key');
+        if (keyEl) keyEl.readOnly = !!r.isBuiltIn;
+        setChk('rp-dashboard',      r.dashboard);
+        setChk('rp-dashboard_own',  r.dashboard_own);
+        setChk('rp-manage',         r.manage);
+        setChk('rp-manage_own_dept',r.manage_own_dept);
+        setChk('rp-admin_setup',    r.admin_setup);
+        setChk('rp-admin_users',    r.admin_users);
+        setChk('rp-admin_roles',    r.admin_roles);
+    },
+
+    async saveRole() {
+        const editKey = document.getElementById('role-edit-key')?.value?.trim();
+        const newKey  = document.getElementById('role-key')?.value?.trim();
+        const label   = document.getElementById('role-label')?.value?.trim();
+        if (!newKey || !label) return alert('กรุณาระบุ Key และชื่อสิทธิ์');
+        if (!/^[a-z0-9_]+$/.test(newKey)) return alert('Key ใช้ได้เฉพาะ a-z, 0-9, _ เท่านั้น');
+
+        const roleData = {
+            label,
+            dashboard:       !!(document.getElementById('rp-dashboard')?.checked),
+            dashboard_own:   !!(document.getElementById('rp-dashboard_own')?.checked),
+            manage:          !!(document.getElementById('rp-manage')?.checked),
+            manage_own_dept: !!(document.getElementById('rp-manage_own_dept')?.checked),
+            admin_setup:     !!(document.getElementById('rp-admin_setup')?.checked),
+            admin_users:     !!(document.getElementById('rp-admin_users')?.checked),
+            admin_roles:     !!(document.getElementById('rp-admin_roles')?.checked),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        // ถ้าเป็น built-in ให้คง isBuiltIn ไว้
+        const roles = _rolesCache || DEFAULT_ROLES;
+        if (roles[editKey || newKey]?.isBuiltIn) roleData.isBuiltIn = true;
+
+        this.showLoader();
+        try {
+            const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('roles');
+            await col.doc(newKey).set(roleData, { merge: true });
+            // ถ้าเปลี่ยน key ให้ลบ key เก่า (เฉพาะ non-built-in)
+            if (editKey && editKey !== newKey && !roles[editKey]?.isBuiltIn) {
+                await col.doc(editKey).delete();
+            }
+            await this.loadRolesCache();
+            this.resetRoleForm();
+            await this.loadRolesTable();
+            alert('บันทึกสิทธิ์เรียบร้อย ✅');
+        } catch (e) {
+            console.error('saveRole error', e);
+            alert('บันทึกไม่สำเร็จ: ' + e.message);
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    async deleteRole(key) {
+        const roles = _rolesCache || DEFAULT_ROLES;
+        if (roles[key]?.isBuiltIn) return alert('ไม่สามารถลบสิทธิ์เริ่มต้นได้');
+        if (!confirm(`ยืนยันลบสิทธิ์ "${roles[key]?.label || key}" ?`)) return;
+        this.showLoader();
+        try {
+            await db.collection('artifacts').doc(appId).collection('public').doc('data')
+                .collection('roles').doc(key).delete();
+            await this.loadRolesCache();
+            await this.loadRolesTable();
+        } catch (e) {
+            console.error('deleteRole error', e);
+            alert('ลบไม่สำเร็จ');
+        } finally {
+            this.hideLoader();
+        }
+    },
+
+    resetRoleForm() {
+        const setEl = (id, val='') => { const el = document.getElementById(id); if(el){ el.value=val; el.readOnly=false; } };
+        const setChk = (id, val=false) => { const el = document.getElementById(id); if(el) el.checked=val; };
+        setEl('role-edit-key'); setEl('role-key'); setEl('role-label');
+        ['rp-dashboard','rp-dashboard_own','rp-manage','rp-manage_own_dept',
+         'rp-admin_setup','rp-admin_users','rp-admin_roles'].forEach(id => setChk(id));
+    },
+
     async saveUser() {
         const editId = document.getElementById('u-edit-id')?.value?.trim();
         const userData = {
@@ -3827,7 +4337,7 @@ async fillDeptSelectForBranches() {
                 <td class="px-6 py-4 font-bold text-indigo-600">${d.username || '-'}</td>
                 <td class="px-6 py-4 font-mono text-purple-700 tracking-wider">${d.password || '-'}</td> 
                 <td class="px-6 py-4">${d.fullname || '-'}</td>
-                <td class="px-6 py-4 text-center"><span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-xs font-bold">${d.role || '-'}</span></td>
+                <td class="px-6 py-4 text-center"><span class="bg-purple-100 text-purple-700 px-2 py-1 rounded-lg text-xs font-bold">${App.getRoleLabelByKey(d.role) || d.role || '-'}</span></td>
                 <td class="px-6 py-4">${d.position || '-'}</td>
                 <td class="px-6 py-4">${d.dept || '-'}</td>
                 <td class="px-6 py-4">${createdAt}</td>
@@ -3888,10 +4398,7 @@ async fillDeptSelectForBranches() {
                             <div class="space-y-1.5">
                                 <label class="text-[11px] font-bold text-gray-500 ml-1">สิทธิ์การใช้งาน</label>
                                 <select id="um-role" class="input-flat w-full bg-white font-bold">
-                                    <option value="admin">ผู้ดูแลระบบ</option>
-                                    <option value="manager">ผู้บริหาร</option>
-                                    <option value="staff_central">เจ้าหน้าที่ส่วนกลาง</option>
-                                    <option value="staff_dept">เจ้าหน้าที่หน่วยงาน</option>
+                                    ${App.getRoleOptions().map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="space-y-1.5">
@@ -4054,39 +4561,52 @@ async fillDeptSelectForBranches() {
             sel.replaceWith(clone);
         };
 
-        const getCol = (name) => db.collection('artifacts').doc(appId)
-            .collection('public').doc('data').collection(name);
-
         try {
-            this.showLoader();
-
-            const [depts, branches, years, issues, strategies, dimensions, units] = await Promise.all([
-                getCol('depts').orderBy('name').get(),
-                getCol('branches').orderBy('name').get().catch(() => ({ docs: [] })),
-                getCol('years').orderBy('name').get().catch(() => ({ docs: [] })),
-                getCol('strat_issues').orderBy('name').get().catch(() => ({ docs: [] })),
-                getCol('strat_strategies').orderBy('name').get().catch(() => ({ docs: [] })),
-                getCol('strat_dimensions').orderBy('name').get().catch(() => ({ docs: [] })),
-                getCol('units').orderBy('name').get().catch(() => ({ docs: [] })),
-            ]);
-
-            const mapDocs = (snap) => (snap?.docs || []).map(d => ({ id: d.id, ...d.data() }));
+            // ใช้ _f4cache ถ้ามีอยู่แล้ว ไม่ fetch ใหม่ (ป้องกันหน้าจอแว๊ป)
+            if (!this._f4cache) {
+                this.showLoader();
+                await this.initManageForm4();
+            }
+            const f4 = this._f4cache;
 
             const cache = this._f6cache = {
-                depts:      mapDocs(depts),
-                branches:   mapDocs(branches),
-                years:      mapDocs(years),
-                issues:     mapDocs(issues),
-                strategies: mapDocs(strategies),
-                dimensions: mapDocs(dimensions),
-                units:      mapDocs(units),
+                depts:      f4.depts      || [],
+                branches:   f4.branches   || [],
+                years:      f4.years      || [],
+                issues:     f4.issues     || [],
+                strategies: f4.strategies || [],
+                dimensions: f4.dimensions || [],
+                units:      f4.units      || [],
             };
 
-            setOptions(document.getElementById('f6-dept'),   cache.depts);
-            // สาขา/งาน: รีเซ็ตรอให้ผู้ใช้เลือก dept ก่อน
-            const f6BranchEl = document.getElementById('f6-branch');
-            if (f6BranchEl) f6BranchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
-            setOptions(document.getElementById('f6-year'),   cache.years);
+            const perm6 = this.getRolePermissions(currentUser?.role);
+            let deptList6 = cache.depts;
+            if (perm6.manage_own_dept && currentUser?.dept) {
+                deptList6 = cache.depts.filter(d => d.name === currentUser.dept || d.id === currentUser.dept);
+            }
+            setOptions(document.getElementById('f6-dept'), deptList6);
+
+            // ถ้า manage_own_dept ให้เลือก + lock + โหลด branch ทันที
+            if (perm6.manage_own_dept && currentUser?.dept) {
+                const deptSel6 = document.getElementById('f6-dept');
+                if (deptSel6) {
+                    deptSel6.value = deptList6[0]?.id || deptList6[0]?.name || '';
+                    deptSel6.disabled = true;
+                }
+                this.f6LoadBranches();
+            } else {
+                // สาขา/งาน: รีเซ็ตรอให้ผู้ใช้เลือก dept ก่อน
+                const f6BranchEl = document.getElementById('f6-branch');
+                if (f6BranchEl) f6BranchEl.innerHTML = '<option value="">— เลือกหน่วยงานก่อน —</option>';
+            }
+            const openYears6 = (cache.years || []).filter(y => y.status === 'เปิดใช้งาน');
+            setOptions(document.getElementById('f6-year'), openYears6);
+            (() => {
+                const sel = document.getElementById('f6-year');
+                if (!sel) return;
+                const main = (cache.years || []).find(y => y.isMain);
+                if (main && !sel.value) sel.value = main.id;
+            })();
             setOptions(document.getElementById('f6-issue'),  cache.issues, '— เลือกประเด็นยุทธศาสตร์ —');
 
             // ตั้งต้น: เพิ่มแถวเริ่มต้นอย่างน้อย 1 แถวในตารางแบบไดนามิกทุกตัว ถ้ายังไม่มี
