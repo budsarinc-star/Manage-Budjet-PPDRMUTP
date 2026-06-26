@@ -1103,9 +1103,13 @@ const UI = {
                             <label class="text-[11px] font-black text-purple-700">🔷 มิติ</label>
                             <div class="flex gap-2"><input id="si-kpidim" placeholder="เช่น มิติที่ 1 ด้านนวัตกรรม..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_kpis','si-kpidim','dimension')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
                         </div>
-                        <div class="flex flex-col gap-1.5 md:col-span-2">
+                        <div class="flex flex-col gap-1.5">
                             <label class="text-[11px] font-black text-purple-700">📊 ตัวชี้วัด</label>
                             <div class="flex gap-2"><input id="si-kpi" placeholder="เช่น จำนวนนักศึกษาที่ได้รับการพัฒนา..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_kpis','si-kpi','kpi')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[11px] font-black text-purple-700">📦 ผลผลิต</label>
+                            <div class="flex gap-2"><input id="si-output" placeholder="เช่น ผลผลิต ด้าน..." class="input-flat flex-1 text-sm"><button onclick="App.saveStratItem('strat_outputs','si-output')" class="p-3 shrink-0 bg-purple-600 text-white rounded-xl hover:bg-purple-700"><i data-lucide="save" size="16"></i></button></div>
                         </div>
                     </div>
                 </div>
@@ -1184,6 +1188,7 @@ const UI = {
     <div id="strat-t1-p5" class="hidden">${this.adminTableBlock('กลยุทธ์ย่อย','strat_sub_strategies',['ลำดับ','ชื่อกลยุทธ์ย่อย','วันที่บันทึก'])}</div>
     <div id="strat-t1-p6" class="hidden">${this.adminTableBlock('มิติ','strat_kpis_dim',['ลำดับ','ชื่อมิติ','ประเภท','วันที่บันทึก'])}</div>
     <div id="strat-t1-p7" class="hidden">${this.adminTableBlock('ตัวชี้วัด','strat_kpis_kpi',['ลำดับ','ชื่อตัวชี้วัด','ประเภท','วันที่บันทึก'])}</div>
+    <div id="strat-t1-p8" class="hidden">${this.adminTableBlock('ผลผลิต','strat_outputs',['ลำดับ','ชื่อผลผลิต','วันที่บันทึก'])}</div>
 </div>
 
 <!-- ===== ตารางที่ 2: ความเชื่อมโยง Step ===== -->

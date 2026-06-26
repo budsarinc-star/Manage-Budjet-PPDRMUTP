@@ -2723,13 +2723,13 @@ async loadAdminAllTables() {
     if (typeof db === 'undefined') return;
     const keys = ['budget_types','years','units','sub_categories','asset_standards','items','categories',
                   'depts','branches','strat_plans','strat_issues','strat_strategies',
-                  'strat_dimensions','strat_sub_strategies','strat_kpis','strat_links'];
+                  'strat_dimensions','strat_sub_strategies','strat_kpis','strat_links','strat_outputs'];
     for (const k of keys) await this.loadAdminTable(k);
     this.adminBuildStratMaps();
     this.adminBuildStratLinks();
     this._buildKpisVirtual();
     ['strat_issues','strat_strategies','strat_dimensions','strat_sub_strategies',
-     'strat_kpis','strat_kpis_dim','strat_kpis_kpi','strat_links'].forEach(k => this.renderAdminTable(k));
+     'strat_kpis','strat_kpis_dim','strat_kpis_kpi','strat_links','strat_outputs'].forEach(k => this.renderAdminTable(k));
     // init dropdown ส่วน B + ตาราง 1
     setTimeout(() => {
         this._lnkLoadPlans();
@@ -2930,6 +2930,7 @@ _stratT1Items: [
     {id:'strat-t1-p5', label:'กลยุทธ์ย่อย'},
     {id:'strat-t1-p6', label:'มิติ'},
     {id:'strat-t1-p7', label:'ตัวชี้วัด'},
+    {id:'strat-t1-p8', label:'ผลผลิต'},
 ],
 _stratT1Render() {
     const cur = this._stratT1Cur, total = this._stratT1Items.length;
